@@ -14,6 +14,10 @@ type BillingInterval = PlanInterval;
 
 const PLAN_ORDER: PlanId[] = ["free", "pro", "pro_plus"];
 
+/** UI-only — does not block /api/billing/checkout. Set true when LS store is verified. */
+const UPGRADE_COMING_SOON =
+  process.env.NEXT_PUBLIC_BILLING_UPGRADE_ENABLED !== "true";
+
 const FEATURES: Record<PlanId, string[]> = {
   free: ["Up to 3 templates", "Paste image URLs", "Export HTML"],
   pro: ["Up to 10 templates", "2 uploaded images per template", "Export HTML"],
@@ -34,8 +38,6 @@ export interface PricingUsageSummary {
 interface PricingSectionProps {
   initialUsage?: PricingUsageSummary | null;
 }
-
-const PAID_PLANS: PlanId[] = ["pro", "pro_plus"];
 
 export function PricingSection({ initialUsage = null }: PricingSectionProps) {
   const { data: session, status } = useSession();
@@ -120,6 +122,7 @@ export function PricingSection({ initialUsage = null }: PricingSectionProps) {
   function planButtonLabel(planId: PlanId): string {
     if (usageLoading && planId !== "free") return "Loading…";
     if (isCurrentPlan(planId)) return "Current plan";
+    if (planId !== "free" && UPGRADE_COMING_SOON) return "Coming soon";
     if (planId === "free") {
       return session?.user ? "Go to dashboard" : "Get started";
     }
@@ -160,48 +163,6 @@ export function PricingSection({ initialUsage = null }: PricingSectionProps) {
           </button>
         </div>
 
-        {interval === "monthly" && (
-          <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 text-left sm:text-center">
-            <p className="text-sm font-medium text-foreground">Save with annual billing</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pay yearly and get a lower effective monthly rate. Same features, less per month.
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {PAID_PLANS.map((planId) => {
-                const plan = PLANS[planId];
-                const savings = annualSavings(planId);
-                if (!savings) return null;
-                return (
-                  <div
-                    key={planId}
-                    className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 text-sm"
-                  >
-                    <p className="font-medium">{plan.name}</p>
-                    <p className="mt-1 text-muted-foreground">
-                      <span className="line-through">${plan.priceMonthly}/mo</span>
-                      {" → "}
-                      <span className="font-medium text-foreground">
-                        ${savings.annualPerMonth}/mo
-                      </span>{" "}
-                      billed ${savings.annualTotal}/yr
-                    </p>
-                    <p className="mt-1 text-xs font-medium text-primary">
-                      Save ${savings.saved}/year ({savings.percent}% off)
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={() => setInterval("annual")}
-              className="mt-4 text-sm font-medium text-primary hover:underline"
-            >
-              Switch to annual pricing →
-            </button>
-          </div>
-        )}
-
         <div className="mt-10 grid gap-6 md:grid-cols-3">
           {PLAN_ORDER.map((planId) => {
             const plan = PLANS[planId];
@@ -209,7 +170,9 @@ export function PricingSection({ initialUsage = null }: PricingSectionProps) {
             const highlighted = planId === "pro";
             const current = !usageLoading && isCurrentPlan(planId);
             const buttonDisabled =
-              planId === "free" ? current : current || !!checkoutLoading || usageLoading;
+              planId === "free"
+                ? current
+                : current || !!checkoutLoading || usageLoading || UPGRADE_COMING_SOON;
             const savings = interval === "monthly" ? annualSavings(planId) : null;
 
             return (
@@ -232,16 +195,23 @@ export function PricingSection({ initialUsage = null }: PricingSectionProps) {
                       </span>
                     )}
                   </div>
-                  <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-3xl font-bold tracking-tight">{price.main}</span>
-                    <span className="text-sm text-muted-foreground">{price.sub}</span>
+                  <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-bold tracking-tight">{price.main}</span>
+                      <span className="text-sm text-muted-foreground">{price.sub}</span>
+                    </div>
+                    {savings && (
+                      <>
+                        <span className="hidden text-muted-foreground sm:inline">·</span>
+                        <span className="text-sm text-muted-foreground">
+                          Annual:{" "}
+                          <span className="font-semibold text-primary">
+                            ${savings.annualPerMonth}/mo
+                          </span>
+                        </span>
+                      </>
+                    )}
                   </div>
-                  {savings && (
-                    <p className="mt-2 text-xs text-primary">
-                      Annual: ${savings.annualPerMonth}/mo · save ${savings.saved}/yr (
-                      {savings.percent}% off)
-                    </p>
-                  )}
                 </div>
 
                 <ul className="mb-6 flex-1 space-y-2">
