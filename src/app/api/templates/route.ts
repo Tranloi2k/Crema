@@ -6,7 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { getPlanLimits } from "@/lib/billing/plans";
 import { db } from "@/lib/db/client";
 import { templates, users } from "@/lib/db/schema";
-import { createRootBlock } from "@/lib/defaultBlocks";
+import { createRootBlock, normalizeRoot } from "@/lib/defaultBlocks";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -24,6 +24,7 @@ export async function GET() {
     rows.map((row) => ({
       id: row.id,
       name: row.name,
+      content: normalizeRoot(JSON.parse(row.content)),
       updatedAt: row.updatedAt,
       createdAt: row.createdAt,
       locked: row.locked ?? false,

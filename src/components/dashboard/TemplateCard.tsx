@@ -5,18 +5,21 @@ import { useState } from "react";
 import { Download, Lock, Trash2 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TemplatePreviewThumbnail } from "@/components/dashboard/TemplatePreviewThumbnail";
 import { blocksToHtml } from "@/lib/export/toHtml";
 import { normalizeRoot } from "@/lib/defaultBlocks";
 
 export function TemplateCard({
   id,
   name,
+  content,
   updatedAt,
   locked = false,
   onDeleted,
 }: {
   id: string;
   name: string;
+  content: unknown;
   updatedAt: number;
   locked?: boolean;
   onDeleted: (id: string) => void;
@@ -50,8 +53,14 @@ export function TemplateCard({
   }
 
   return (
-    <Card className="rounded-2xl border-muted-foreground/10 shadow-sm transition-shadow hover:shadow-md">
-      <CardHeader>
+    <Card className="overflow-hidden rounded-2xl border-muted-foreground/10 shadow-sm transition-shadow hover:shadow-md">
+      <Link href={`/editor/${id}`} className="block">
+        <TemplatePreviewThumbnail
+          content={content}
+          className="h-40 border-b border-muted-foreground/10"
+        />
+      </Link>
+      <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="truncate text-base">{name}</CardTitle>
           {locked && (

@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import type { Block, BlockType, StackBlock } from "@/lib/types";
 import { createBlock, cloneBlockWithNewIds, createRootBlock, ROOT_ID } from "@/lib/defaultBlocks";
+import type { MergeTagProviderId } from "@/lib/mergeTags/types";
+import { loadMergeTagProviderId, saveMergeTagProviderId } from "@/lib/mergeTags/providers";
+
+export type TextEditorApi = {
+  insertAtCursor: (text: string) => void;
+  focus: () => void;
+};
 
 function findAndUpdate(blocks: Block[], id: string, updater: (b: Block) => Block): Block[] {
   return blocks.map((b) => {
@@ -130,9 +137,14 @@ interface EditorState {
   selectedBlockId: string | null;
   clipboard: Block | null;
   dirty: boolean;
+  mergeTagProvider: MergeTagProviderId;
+  activeTextEditor: TextEditorApi | null;
 
   loadTemplate: (templateId: string, name: string, root: StackBlock) => void;
   setName: (name: string) => void;
+  setMergeTagProvider: (id: MergeTagProviderId) => void;
+  registerTextEditor: (api: TextEditorApi | null) => void;
+  insertMergeTag: (tag: string) => void;
   addBlock: (type: BlockType, parentId?: string | null, index?: number) => void;
   removeBlock: (id: string) => void;
   updateBlock: (id: string, partial: Partial<Block>) => void;
@@ -152,11 +164,46 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedBlockId: null,
   clipboard: null,
   dirty: false,
+  mergeTagProvider: loadMergeTagProviderId(),
+  activeTextEditor: null,
 
   loadTemplate: (templateId, name, root) =>
     set({ templateId, name, root, selectedBlockId: null, dirty: false }),
 
   setName: (name) => set({ name, dirty: true }),
+
+  setMergeTagProvider: (id) => {
+    saveMergeTagProviderId(id);
+    set({ mergeTagProvider: id });
+  },
+
+  registerTextEditor: (api) => set({ activeTextEditor: api }),
+
+  insertMergeTag: (tag) => {
+    const { activeTextEditor, selectedBlockId, root } = useEditorStore.getState();
+    if (activeTextEditor) {
+      activeTextEditor.focus();
+      activeTextEditor.insertAtCursor(tag);
+      return;
+    }
+    if (!selectedBlockId) return;
+    const block = findBlock(root, selectedBlockId);
+    if (!block || block.type !== "text") return;
+    const html = block.content.html;
+    const closeIdx = html.lastIndexOf("</p>");
+    const nextHtml =
+      closeIdx === -1 ? `${html}${tag}` : `${html.slice(0, closeIdx)}${tag}${html.slice(closeIdx)}`;
+    set((state) => ({
+      root: {
+        ...state.root,
+        children: findAndUpdate(state.root.children, selectedBlockId, (b) => {
+          if (b.type !== "text") return b;
+          return { ...b, content: { html: nextHtml } };
+        }),
+      },
+      dirty: true,
+    }));
+  },
 
   addBlock: (type, parentId = null, index = Number.MAX_SAFE_INTEGER) =>
     set((state) => {

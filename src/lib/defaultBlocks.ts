@@ -115,7 +115,8 @@ export function createRootBlock(): StackBlock {
       justify: "start",
       align: "start",
       width: dim(600, "px"),
-      height: dim(0, "fit-content"),
+      height: dim(600, "px"),
+      bgColor: "#ffffff",
     },
     children: [],
   };

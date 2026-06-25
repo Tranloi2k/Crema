@@ -15,7 +15,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen flex-col">
       <Navbar />
       <DowngradeSelectionGate />
-      <div className="flex-1">{children}</div>
+      <main className="flex-1 bg-muted/40">{children}</main>
     </div>
   );
 }

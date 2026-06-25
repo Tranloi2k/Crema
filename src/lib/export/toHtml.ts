@@ -286,8 +286,11 @@ function renderBlockCell(block: Block, ctx: RenderContext = {}): string {
 function renderEmailTable(root: StackBlock, canvasWidth: number): string {
   const rootPad = pad(root.style);
   const containerCss = commonContainerTableCss(root.style);
+  const rootH = toDimension(root.style.height, dim(0, "fit-content"));
+  const frameHeightCss =
+    rootH.unit === "px" && rootH.value > 0 ? `min-height:${rootH.value}px;` : "";
 
-  return `<table id="crema-email" role="presentation" width="${canvasWidth}" cellpadding="0" cellspacing="0" border="0" style="width:${canvasWidth}px;max-width:100%;box-sizing:border-box;background-color:#ffffff;${containerCss};">
+  return `<table id="crema-email" role="presentation" width="${canvasWidth}" cellpadding="0" cellspacing="0" border="0" style="width:${canvasWidth}px;max-width:100%;box-sizing:border-box;background-color:#ffffff;${frameHeightCss}${containerCss};">
         <tr>
           <td id="crema-email-content" style="padding:${rootPad};">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">

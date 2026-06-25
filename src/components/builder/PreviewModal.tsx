@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { blocksToHtml } from "@/lib/export/toHtml";
+import { substituteMergeTags } from "@/lib/mergeTags/substitute";
+import { useEditorStore } from "@/lib/store/editorStore";
 import type { StackBlock } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -33,12 +35,17 @@ export function PreviewModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const [mode, setMode] = useState<PreviewMode>("desktop");
+  const [useSampleData, setUseSampleData] = useState(false);
+  const mergeTagProvider = useEditorStore((s) => s.mergeTagProvider);
   const previewWidth = PREVIEW_WIDTHS[mode];
 
-  const srcDoc = useMemo(
-    () => blocksToHtml(root, { width: previewWidth }),
-    [root, previewWidth]
-  );
+  const srcDoc = useMemo(() => {
+    let html = blocksToHtml(root, { width: previewWidth });
+    if (useSampleData) {
+      html = substituteMergeTags(html, mergeTagProvider);
+    }
+    return html;
+  }, [root, previewWidth, useSampleData, mergeTagProvider]);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeHeight, setIframeHeight] = useState(FALLBACK_PREVIEW_HEIGHT);
@@ -80,7 +87,17 @@ export function PreviewModal({
                 Xem email như trong hộp thư — chuyển Desktop / Mobile để kiểm tra bố cục.
               </DialogDescription>
             </div>
-            <div className="flex rounded-lg border bg-muted/40 p-0.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={useSampleData ? "default" : "outline"}
+                onClick={() => setUseSampleData((v) => !v)}
+                className="h-8 px-3 text-xs"
+              >
+                {useSampleData ? "Sample data on" : "Sample data off"}
+              </Button>
+              <div className="flex rounded-lg border bg-muted/40 p-0.5">
               <Button
                 type="button"
                 size="sm"
@@ -101,6 +118,7 @@ export function PreviewModal({
                 <Smartphone className="h-3.5 w-3.5" />
                 Mobile
               </Button>
+              </div>
             </div>
           </div>
         </DialogHeader>
@@ -129,6 +147,7 @@ export function PreviewModal({
           </div>
           <p className="mt-3 text-center text-xs text-muted-foreground">
             {previewWidth}px wide · {mode === "desktop" ? "Desktop inbox" : "Mobile inbox"}
+            {useSampleData && " · Variables replaced with sample values"}
           </p>
         </div>
       </DialogContent>

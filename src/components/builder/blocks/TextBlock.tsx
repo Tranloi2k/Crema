@@ -15,6 +15,7 @@ import {
   textInnerLayoutStyle,
   textTypographyToReactStyle,
 } from "@/lib/export/textStyle";
+import { MergeTagHighlight } from "@/lib/tiptap/mergeTagHighlight";
 import { cn } from "@/lib/utils";
 
 export function TextBlock({
@@ -25,6 +26,9 @@ export function TextBlock({
   compactWidth?: boolean;
 }) {
   const updateBlock = useEditorStore((s) => s.updateBlock);
+  const selectedBlockId = useEditorStore((s) => s.selectedBlockId);
+  const registerTextEditor = useEditorStore((s) => s.registerTextEditor);
+  const isSelected = selectedBlockId === block.id;
   const fixedHeight = hasFixedTextHeight(block.style);
   const isFillWidth = toDimension(block.style.width, dim(0, "fill")).unit === "fill";
   const useFullWidth = isFillWidth && !compactWidth;
@@ -34,6 +38,7 @@ export function TextBlock({
       StarterKit,
       Link.configure({ openOnClick: false }),
       TextAlign.configure({ types: ["paragraph"] }),
+      MergeTagHighlight,
     ],
     content: block.content.html,
     onUpdate: ({ editor }) => {
@@ -51,6 +56,19 @@ export function TextBlock({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [block.content.html]);
 
+  useEffect(() => {
+    if (!editor || !isSelected) return;
+    registerTextEditor({
+      insertAtCursor: (text) => {
+        editor.chain().focus().insertContent(text).run();
+      },
+      focus: () => {
+        editor.commands.focus();
+      },
+    });
+    return () => registerTextEditor(null);
+  }, [editor, isSelected, registerTextEditor]);
+
   return (
     <div
       style={{
@@ -61,7 +79,11 @@ export function TextBlock({
           : {}),
         ...commonStyleToReactStyle(block.style),
       }}
-      className={cn(useFullWidth && "w-full", fixedHeight && "min-h-0 flex-1")}
+      className={cn(
+        useFullWidth && "w-full",
+        fixedHeight && "min-h-0 flex-1",
+        "text-block-surface"
+      )}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div

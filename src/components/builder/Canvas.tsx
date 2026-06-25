@@ -64,7 +64,9 @@ export function Canvas({ root, zoom, tool }: { root: StackBlock; zoom: number; t
             }}
             style={{
               width: 600,
-              ...(emailHeight !== undefined ? { minHeight: 400, height: emailHeight } : {}),
+              ...(emailHeight !== undefined
+                ? { minHeight: CANVAS_EMAIL_HEIGHT_PX, height: emailHeight }
+                : {}),
               display: "flex",
               flexDirection: "column",
               padding: sidesToCss(toSides(root.style.padding)),

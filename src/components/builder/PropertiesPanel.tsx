@@ -32,6 +32,17 @@ import {
   OptionButton,
   OptionButtonGroup,
 } from "@/components/builder/properties/fields";
+import { MergeTagInsertMenu } from "@/components/builder/VariablesPanel";
+
+function insertAtInputCursor(
+  value: string,
+  insert: string,
+  input: HTMLInputElement | null
+): string {
+  const start = input?.selectionStart ?? value.length;
+  const end = input?.selectionEnd ?? value.length;
+  return value.slice(0, start) + insert + value.slice(end);
+}
 
 function NameSection({ block }: { block: Block }) {
   const updateBlock = useEditorStore((s) => s.updateBlock);
@@ -164,6 +175,13 @@ function TextProperties({ block }: { block: TextBlock }) {
 
   return (
     <>
+      <Section title="Content">
+        <Row label="Variable">
+          <MergeTagInsertMenu
+            onInsert={(tag) => useEditorStore.getState().insertMergeTag(tag)}
+          />
+        </Row>
+      </Section>
       <Section title="Typography">
         <Row label="Font">
           <SelectInput
@@ -422,28 +440,56 @@ function ImageProperties({
 
 function ButtonProperties({ block }: { block: ButtonBlock }) {
   const updateBlock = useEditorStore((s) => s.updateBlock);
+  const labelRef = useRef<HTMLInputElement>(null);
+  const hrefRef = useRef<HTMLInputElement>(null);
   const padding = toSides(block.style.padding);
   return (
     <>
       <Section title="Content">
         <Row label="Label">
-          <Input
-            value={block.content.label}
-            onChange={(e) =>
-              updateBlock(block.id, { content: { ...block.content, label: e.target.value } })
-            }
-            className="h-7 text-xs"
-          />
+          <div className="flex w-full gap-1">
+            <Input
+              ref={labelRef}
+              value={block.content.label}
+              onChange={(e) =>
+                updateBlock(block.id, { content: { ...block.content, label: e.target.value } })
+              }
+              className="h-7 min-w-0 flex-1 text-xs"
+            />
+            <MergeTagInsertMenu
+              onInsert={(tag) =>
+                updateBlock(block.id, {
+                  content: {
+                    ...block.content,
+                    label: insertAtInputCursor(block.content.label, tag, labelRef.current),
+                  },
+                })
+              }
+            />
+          </div>
         </Row>
         <Row label="Link">
-          <Input
-            value={block.content.href}
-            onChange={(e) =>
-              updateBlock(block.id, { content: { ...block.content, href: e.target.value } })
-            }
-            placeholder="Page or URL..."
-            className="h-7 text-xs"
-          />
+          <div className="flex w-full gap-1">
+            <Input
+              ref={hrefRef}
+              value={block.content.href}
+              onChange={(e) =>
+                updateBlock(block.id, { content: { ...block.content, href: e.target.value } })
+              }
+              placeholder="Page or URL..."
+              className="h-7 min-w-0 flex-1 text-xs"
+            />
+            <MergeTagInsertMenu
+              onInsert={(tag) =>
+                updateBlock(block.id, {
+                  content: {
+                    ...block.content,
+                    href: insertAtInputCursor(block.content.href, tag, hrefRef.current),
+                  },
+                })
+              }
+            />
+          </div>
         </Row>
       </Section>
       <Section title="Style">

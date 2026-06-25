@@ -3,7 +3,7 @@ import { dim, toDimension } from "@/lib/types";
 import { getParentStack } from "@/lib/store/editorStore";
 
 /** Canvas email frame height used as the root stack's parent reference. */
-export const CANVAS_EMAIL_HEIGHT_PX = 400;
+export const CANVAS_EMAIL_HEIGHT_PX = 600;
 
 /** Canvas email frame width used as the root stack's parent reference. */
 export const CANVAS_EMAIL_WIDTH_PX = 600;
@@ -54,15 +54,21 @@ function resolveStackFrameHeightPx(stack: StackBlock, outerPx: number): number {
   }
 }
 
+function getRootFrameHeightPx(root: StackBlock): number {
+  const h = toDimension(root.style.height, dim(0, "fit-content"));
+  if (h.unit === "px" && h.value > 0) return h.value;
+  return CANVAS_EMAIL_HEIGHT_PX;
+}
+
 /** Parent stack frame height in px — used to convert child height units. */
 export function getParentHeightPxForBlock(root: StackBlock, blockId: string): number {
-  if (blockId === root.id) return CANVAS_EMAIL_HEIGHT_PX;
+  if (blockId === root.id) return getRootFrameHeightPx(root);
 
   const parent = getParentStack(root, blockId);
-  if (!parent) return CANVAS_EMAIL_HEIGHT_PX;
+  if (!parent) return getRootFrameHeightPx(root);
 
   const outerPx =
-    parent.id === root.id ? CANVAS_EMAIL_HEIGHT_PX : getParentHeightPxForBlock(root, parent.id);
+    parent.id === root.id ? getRootFrameHeightPx(root) : getParentHeightPxForBlock(root, parent.id);
 
   return Math.max(1, Math.round(resolveStackFrameHeightPx(parent, outerPx)));
 }

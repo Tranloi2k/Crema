@@ -135,7 +135,7 @@ export default function EditorPage() {
       <Toolbar onPreview={() => setPreviewOpen(true)} readOnly={readOnly} />
       <div className="flex flex-1 overflow-hidden">
         {!readOnly && (
-          <aside className="flex w-60 flex-col overflow-hidden border-r bg-muted/30">
+          <aside className="flex w-64 flex-col overflow-hidden border-r bg-muted/30">
             <LeftPanel />
           </aside>
         )}

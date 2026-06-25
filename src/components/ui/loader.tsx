@@ -17,12 +17,15 @@ export function LoadingOverlay({ label }: { label?: string }) {
 
 export function SkeletonCard() {
   return (
-    <div className="rounded-2xl border bg-card p-6 shadow-sm">
-      <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
-      <div className="mt-3 h-3 w-2/3 animate-pulse rounded bg-muted" />
-      <div className="mt-6 flex items-center justify-between">
-        <div className="h-8 w-16 animate-pulse rounded-full bg-muted" />
-        <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="h-40 animate-pulse bg-muted" />
+      <div className="p-6">
+        <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+        <div className="mt-3 h-3 w-2/3 animate-pulse rounded bg-muted" />
+        <div className="mt-6 flex items-center justify-between">
+          <div className="h-8 w-16 animate-pulse rounded-full bg-muted" />
+          <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+        </div>
       </div>
     </div>
   );

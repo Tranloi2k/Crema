@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/ui/loader";
 import { TemplateCard } from "@/components/dashboard/TemplateCard";
 import type { PlanId } from "@/lib/billing/plans";
+import type { StackBlock } from "@/lib/types";
 import { parseJsonResponse } from "@/lib/parseJsonResponse";
 
 interface TemplateSummary {
   id: string;
   name: string;
+  content: StackBlock;
   updatedAt: number;
   locked?: boolean;
 }
@@ -129,6 +131,7 @@ export function TemplateList() {
               key={t.id}
               id={t.id}
               name={t.name}
+              content={t.content}
               updatedAt={t.updatedAt}
               locked={t.locked}
               onDeleted={(id) => {

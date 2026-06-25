@@ -78,6 +78,21 @@
   margin-top: 0.5em;
 }
 
+/* Merge tag chips in the text editor (Brevo, Mailchimp, etc.) */
+.text-block-surface .tiptap .merge-tag-chip,
+.text-block-editor .tiptap .merge-tag-chip {
+  display: inline;
+  padding: 0.1em 0.35em;
+  border-radius: 0.25rem;
+  background: hsl(243 75% 59% / 0.12);
+  color: hsl(243 75% 45%);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+  white-space: nowrap;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 /* ---- Marketing site helpers ---- */
 
 /* Brand gradient text for logo / headline accents */
