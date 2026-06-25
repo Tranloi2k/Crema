@@ -1,61 +1,86 @@
 import { eq } from "drizzle-orm";
-import type Stripe from "stripe";
 
 import { handlePlanDowngrade, handlePlanUpgrade } from "@/lib/billing/downgrade";
-import { planFromStripePriceId, type PlanId } from "@/lib/billing/plans";
-import { getStripe } from "@/lib/billing/stripe";
+import {
+  getSubscription,
+  listSubscriptionsByCustomer,
+  type LemonSubscription,
+} from "@/lib/billing/lemonSqueezy";
+import { isLemonSqueezyConfigured } from "@/lib/billing/lemonSqueezy";
+import { planFromLemonVariantId, type PlanId } from "@/lib/billing/plans";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 
-export async function findUserIdFromSubscription(
-  subscription: Stripe.Subscription
+function customUserId(customData: unknown): string | null {
+  if (!customData || typeof customData !== "object") return null;
+  const record = customData as Record<string, unknown>;
+  const userId = record.user_id ?? record.userId;
+  return typeof userId === "string" ? userId : null;
+}
+
+export async function findUserIdFromLemonSubscription(
+  subscription: LemonSubscription,
+  webhookCustomData?: unknown
 ): Promise<string | null> {
-  if (subscription.metadata?.userId) return subscription.metadata.userId;
+  const fromWebhook = customUserId(webhookCustomData);
+  if (fromWebhook) return fromWebhook;
 
-  const customerId =
-    typeof subscription.customer === "string"
-      ? subscription.customer
-      : subscription.customer?.id;
-
-  if (!customerId) return null;
-
+  const customerId = String(subscription.attributes.customer_id);
   const user = await db.query.users.findFirst({
-    where: eq(users.stripeCustomerId, customerId),
+    where: eq(users.billingCustomerId, customerId),
   });
   return user?.id ?? null;
 }
 
-export function mapSubscriptionStatus(
-  status: Stripe.Subscription.Status
+export function isLemonSubscriptionEntitled(subscription: LemonSubscription): boolean {
+  const { status, ends_at } = subscription.attributes;
+  if (status === "active" || status === "on_trial" || status === "past_due" || status === "paused") {
+    return true;
+  }
+  if (status === "unpaid") return true;
+  if (status === "cancelled" && ends_at) {
+    return new Date(ends_at) > new Date();
+  }
+  return false;
+}
+
+export function mapLemonSubscriptionStatus(
+  status: string
 ): "active" | "canceled" | "past_due" | null {
-  if (status === "active" || status === "trialing") return "active";
+  if (status === "active" || status === "on_trial" || status === "paused") return "active";
+  if (status === "cancelled") return "active";
   if (status === "past_due" || status === "unpaid") return "past_due";
-  if (status === "canceled" || status === "incomplete_expired") return "canceled";
+  if (status === "expired") return "canceled";
   return null;
 }
 
-export async function syncActiveSubscription(subscription: Stripe.Subscription) {
-  const userId = await findUserIdFromSubscription(subscription);
+function subscriptionPeriodEnd(subscription: LemonSubscription): Date | null {
+  const { renews_at, ends_at, status } = subscription.attributes;
+  const raw = status === "cancelled" ? (ends_at ?? renews_at) : (renews_at ?? ends_at);
+  return raw ? new Date(raw) : null;
+}
+
+export async function syncActiveLemonSubscription(
+  subscription: LemonSubscription,
+  webhookCustomData?: unknown
+) {
+  const userId = await findUserIdFromLemonSubscription(subscription, webhookCustomData);
   if (!userId) return null;
 
-  const priceId = subscription.items.data[0]?.price?.id;
-  if (!priceId) return null;
-
-  const mapped = planFromStripePriceId(priceId);
+  const mapped = planFromLemonVariantId(subscription.attributes.variant_id);
   if (!mapped) return null;
 
-  const periodEndRaw = (subscription as Stripe.Subscription & { current_period_end?: number })
-    .current_period_end;
-  const periodEnd = periodEndRaw ? new Date(periodEndRaw * 1000) : null;
+  const customerId = String(subscription.attributes.customer_id);
 
   await db
     .update(users)
     .set({
       plan: mapped.planId,
       planInterval: mapped.interval,
-      planStatus: mapSubscriptionStatus(subscription.status),
-      planCurrentPeriodEnd: periodEnd,
-      stripeSubscriptionId: subscription.id,
+      planStatus: mapLemonSubscriptionStatus(subscription.attributes.status),
+      planCurrentPeriodEnd: subscriptionPeriodEnd(subscription),
+      billingCustomerId: customerId,
+      billingSubscriptionId: subscription.id,
     })
     .where(eq(users.id, userId));
 
@@ -63,15 +88,18 @@ export async function syncActiveSubscription(subscription: Stripe.Subscription) 
   return { userId, planId: mapped.planId, interval: mapped.interval };
 }
 
-export async function syncCanceledSubscription(subscription: Stripe.Subscription) {
-  const userId = await findUserIdFromSubscription(subscription);
+export async function syncCanceledLemonSubscription(
+  subscription: LemonSubscription,
+  webhookCustomData?: unknown
+) {
+  const userId = await findUserIdFromLemonSubscription(subscription, webhookCustomData);
   if (!userId) return null;
 
   await db
     .update(users)
     .set({
       planStatus: "canceled",
-      stripeSubscriptionId: null,
+      billingSubscriptionId: null,
       planInterval: null,
       planCurrentPeriodEnd: null,
     })
@@ -81,42 +109,52 @@ export async function syncCanceledSubscription(subscription: Stripe.Subscription
   return { userId, planId: "free" as PlanId };
 }
 
-/** Pull latest subscription state from Stripe (fallback when webhook was not delivered). */
-export async function syncUserSubscriptionFromStripe(userId: string) {
-  const stripe = getStripe();
-  if (!stripe) return { synced: false as const, reason: "stripe_not_configured" };
+export async function processLemonSubscription(
+  subscription: LemonSubscription,
+  webhookCustomData?: unknown
+) {
+  if (isLemonSubscriptionEntitled(subscription)) {
+    return syncActiveLemonSubscription(subscription, webhookCustomData);
+  }
+  return syncCanceledLemonSubscription(subscription, webhookCustomData);
+}
 
-  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
-  if (!user?.stripeCustomerId) {
-    return { synced: false as const, reason: "no_stripe_customer" };
+/** Pull latest subscription state from Lemon Squeezy (fallback when webhook was not delivered). */
+export async function syncUserSubscription(userId: string) {
+  if (!isLemonSqueezyConfigured()) {
+    return { synced: false as const, reason: "lemon_squeezy_not_configured" };
   }
 
-  const subscriptions = await stripe.subscriptions.list({
-    customer: user.stripeCustomerId,
-    status: "all",
-    limit: 10,
-  });
+  const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!user) {
+    return { synced: false as const, reason: "user_not_found" };
+  }
 
-  const active = subscriptions.data.find(
-    (s) => s.status === "active" || s.status === "trialing"
-  );
+  let subscriptions: LemonSubscription[] = [];
 
-  if (active) {
-    const result = await syncActiveSubscription(active);
+  if (user.billingSubscriptionId) {
+    try {
+      subscriptions = [await getSubscription(user.billingSubscriptionId)];
+    } catch {
+      subscriptions = [];
+    }
+  }
+
+  if (subscriptions.length === 0 && user.billingCustomerId) {
+    subscriptions = await listSubscriptionsByCustomer(user.billingCustomerId);
+  }
+
+  const entitled = subscriptions.find(isLemonSubscriptionEntitled);
+  if (entitled) {
+    const result = await syncActiveLemonSubscription(entitled);
     if (!result) return { synced: false as const, reason: "mapping_failed" };
     return { synced: true as const, plan: result.planId, interval: result.interval };
   }
 
-  if (user.stripeSubscriptionId) {
-    try {
-      const sub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-      if (sub.status === "canceled" || sub.status === "incomplete_expired") {
-        await syncCanceledSubscription(sub);
-        return { synced: true as const, plan: "free" as PlanId };
-      }
-    } catch {
-      // subscription may have been removed in Stripe
-    }
+  const latest = subscriptions[0];
+  if (latest && !isLemonSubscriptionEntitled(latest)) {
+    await syncCanceledLemonSubscription(latest);
+    return { synced: true as const, plan: "free" as PlanId };
   }
 
   return { synced: false as const, reason: "no_active_subscription" };

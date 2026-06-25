@@ -59,7 +59,7 @@ export default function BillingPageClient() {
               setSyncMessage(null);
             } else if (!syncData.synced) {
               setSyncMessage(
-                "Payment received. If your plan does not update, run Stripe webhook forwarding locally or refresh in a moment."
+                "Payment received. If your plan does not update, refresh in a moment or check your Lemon Squeezy webhook."
               );
             }
           }

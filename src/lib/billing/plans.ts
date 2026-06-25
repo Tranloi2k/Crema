@@ -59,28 +59,31 @@ export function planRank(planId: PlanId): number {
   return ranks[planId];
 }
 
-export function stripePriceId(planId: PlanId, interval: PlanInterval): string | null {
+export function lemonVariantId(planId: PlanId, interval: PlanInterval): string | null {
   if (planId === "free") return null;
   const envKey =
     planId === "pro"
       ? interval === "monthly"
-        ? "STRIPE_PRICE_PRO_MONTHLY"
-        : "STRIPE_PRICE_PRO_ANNUAL"
+        ? "LEMONSQUEEZY_VARIANT_PRO_MONTHLY"
+        : "LEMONSQUEEZY_VARIANT_PRO_ANNUAL"
       : interval === "monthly"
-        ? "STRIPE_PRICE_PRO_PLUS_MONTHLY"
-        : "STRIPE_PRICE_PRO_PLUS_ANNUAL";
+        ? "LEMONSQUEEZY_VARIANT_PRO_PLUS_MONTHLY"
+        : "LEMONSQUEEZY_VARIANT_PRO_PLUS_ANNUAL";
   return process.env[envKey] ?? null;
 }
 
-export function planFromStripePriceId(priceId: string): { planId: PlanId; interval: PlanInterval } | null {
+export function planFromLemonVariantId(
+  variantId: string | number
+): { planId: PlanId; interval: PlanInterval } | null {
+  const id = String(variantId);
   const mapping: [string | undefined, PlanId, PlanInterval][] = [
-    [process.env.STRIPE_PRICE_PRO_MONTHLY, "pro", "monthly"],
-    [process.env.STRIPE_PRICE_PRO_ANNUAL, "pro", "annual"],
-    [process.env.STRIPE_PRICE_PRO_PLUS_MONTHLY, "pro_plus", "monthly"],
-    [process.env.STRIPE_PRICE_PRO_PLUS_ANNUAL, "pro_plus", "annual"],
+    [process.env.LEMONSQUEEZY_VARIANT_PRO_MONTHLY, "pro", "monthly"],
+    [process.env.LEMONSQUEEZY_VARIANT_PRO_ANNUAL, "pro", "annual"],
+    [process.env.LEMONSQUEEZY_VARIANT_PRO_PLUS_MONTHLY, "pro_plus", "monthly"],
+    [process.env.LEMONSQUEEZY_VARIANT_PRO_PLUS_ANNUAL, "pro_plus", "annual"],
   ];
-  for (const [envPrice, planId, interval] of mapping) {
-    if (envPrice && envPrice === priceId) return { planId, interval };
+  for (const [envVariant, planId, interval] of mapping) {
+    if (envVariant && envVariant === id) return { planId, interval };
   }
   return null;
 }

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { requireUserId } from "@/lib/billing/requireUser";
-import { syncUserSubscriptionFromStripe } from "@/lib/billing/syncSubscription";
 import { getUserBilling } from "@/lib/billing/getUserBilling";
+import { requireUserId } from "@/lib/billing/requireUser";
+import { syncUserSubscription } from "@/lib/billing/syncSubscription";
 
 export async function POST() {
   try {
@@ -11,7 +11,7 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const sync = await syncUserSubscriptionFromStripe(userId);
+    const sync = await syncUserSubscription(userId);
     const billing = await getUserBilling(userId);
 
     return NextResponse.json({

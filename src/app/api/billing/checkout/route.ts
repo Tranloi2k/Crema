@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
+import { createCheckout, isLemonSqueezyConfigured } from "@/lib/billing/lemonSqueezy";
 import { requireUserId } from "@/lib/billing/requireUser";
-import { getStripe } from "@/lib/billing/stripe";
-import { isPlanId, stripePriceId, type PlanId, type PlanInterval } from "@/lib/billing/plans";
+import { isPlanId, lemonVariantId, type PlanId, type PlanInterval } from "@/lib/billing/plans";
+import { getAppBaseUrl } from "@/lib/appUrl";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 
@@ -13,9 +14,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const stripe = getStripe();
-  if (!stripe) {
-    return NextResponse.json({ error: "Stripe is not configured." }, { status: 503 });
+  if (!isLemonSqueezyConfigured()) {
+    return NextResponse.json({ error: "Billing is not configured." }, { status: 503 });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -26,9 +26,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid plan." }, { status: 400 });
   }
 
-  const priceId = stripePriceId(planId as PlanId, interval as PlanInterval);
-  if (!priceId) {
-    return NextResponse.json({ error: "Price not configured for this plan." }, { status: 503 });
+  const variantId = lemonVariantId(planId as PlanId, interval as PlanInterval);
+  if (!variantId) {
+    return NextResponse.json({ error: "Variant not configured for this plan." }, { status: 503 });
   }
 
   const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
@@ -36,29 +36,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "User email is required for checkout." }, { status: 400 });
   }
 
-  let customerId = user.stripeCustomerId;
-  if (!customerId) {
-    const customer = await stripe.customers.create({
+  const baseUrl = getAppBaseUrl();
+
+  try {
+    const url = await createCheckout({
+      variantId,
       email: user.email,
-      name: user.name ?? undefined,
-      metadata: { userId },
+      name: user.name,
+      userId,
+      planId,
+      interval,
+      redirectUrl: `${baseUrl}/dashboard/billing?success=1`,
     });
-    customerId = customer.id;
-    await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
+    return NextResponse.json({ url });
+  } catch (err) {
+    console.error("POST /api/billing/checkout", err);
+    return NextResponse.json({ error: "Failed to create checkout." }, { status: 500 });
   }
-
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3001";
-  const session = await stripe.checkout.sessions.create({
-    customer: customerId,
-    mode: "subscription",
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${baseUrl}/dashboard/billing?success=1`,
-    cancel_url: `${baseUrl}/dashboard/billing?canceled=1`,
-    metadata: { userId, planId, interval },
-    subscription_data: {
-      metadata: { userId, planId, interval },
-    },
-  });
-
-  return NextResponse.json({ url: session.url });
 }

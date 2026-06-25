@@ -67,19 +67,6 @@ export function getParentHeightPxForBlock(root: StackBlock, blockId: string): nu
   return Math.max(1, Math.round(resolveStackFrameHeightPx(parent, outerPx)));
 }
 
-function resolveWidthToPx(w: Dimension, parentPx: number): number {
-  switch (w.unit) {
-    case "px":
-      return w.value;
-    case "%":
-      return (w.value / 100) * parentPx;
-    case "fill":
-      return parentPx;
-    default:
-      return w.value;
-  }
-}
-
 function resolveStackFrameWidthPx(stack: StackBlock, outerPx: number): number {
   const w = toDimension(stack.style.width, dim(0, "fit-content"));
   switch (w.unit) {

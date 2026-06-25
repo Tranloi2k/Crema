@@ -16,8 +16,8 @@ export const users = sqliteTable("user", {
   planInterval: text("planInterval"),
   planStatus: text("planStatus"),
   planCurrentPeriodEnd: integer("planCurrentPeriodEnd", { mode: "timestamp_ms" }),
-  stripeCustomerId: text("stripeCustomerId"),
-  stripeSubscriptionId: text("stripeSubscriptionId"),
+  billingCustomerId: text("billingCustomerId"),
+  billingSubscriptionId: text("billingSubscriptionId"),
   downgradeSelectionPending: integer("downgradeSelectionPending", { mode: "boolean" })
     .notNull()
     .default(false),
