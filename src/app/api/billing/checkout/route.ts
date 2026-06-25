@@ -36,6 +36,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "User email is required for checkout." }, { status: 400 });
   }
 
+  const alreadyOnPlan =
+    user.plan === planId &&
+    user.planInterval === interval &&
+    !!user.billingSubscriptionId &&
+    user.planStatus !== "cancelled" &&
+    user.planStatus !== "canceled";
+
+  if (alreadyOnPlan) {
+    return NextResponse.json({ error: "You are already on this plan." }, { status: 400 });
+  }
+
   const baseUrl = getAppBaseUrl();
 
   try {

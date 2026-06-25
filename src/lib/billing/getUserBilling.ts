@@ -30,6 +30,7 @@ export async function getUserBilling(userId: string) {
     planInterval: user.planInterval,
     planStatus: user.planStatus,
     planCurrentPeriodEnd: user.planCurrentPeriodEnd,
+    hasSubscription: !!user.billingSubscriptionId && planId !== "free",
     downgradeSelectionPending: user.downgradeSelectionPending ?? false,
     limits,
     templateCount: countResult?.value ?? 0,

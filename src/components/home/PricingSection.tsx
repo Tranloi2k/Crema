@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PLANS, type PlanId } from "@/lib/billing/plans";
+import { PLANS, type PlanId, type PlanInterval } from "@/lib/billing/plans";
+import { parseJsonResponse } from "@/lib/parseJsonResponse";
 import { cn } from "@/lib/utils";
 
-type BillingInterval = "monthly" | "annual";
+type BillingInterval = PlanInterval;
 
 const PLAN_ORDER: PlanId[] = ["free", "pro", "pro_plus"];
 
@@ -24,17 +25,50 @@ const FEATURES: Record<PlanId, string[]> = {
   ],
 };
 
+interface UsageSummary {
+  plan: PlanId;
+  planInterval: string | null;
+  planStatus: string | null;
+}
+
 export function PricingSection() {
   const { data: session } = useSession();
   const router = useRouter();
   const [interval, setInterval] = useState<BillingInterval>("monthly");
   const [loading, setLoading] = useState<PlanId | null>(null);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
+
+  useEffect(() => {
+    if (!session?.user) {
+      setUsage(null);
+      return;
+    }
+    fetch("/api/billing/usage")
+      .then(async (res) => {
+        const data = await parseJsonResponse<UsageSummary>(res);
+        if (res.ok && data?.plan) {
+          setUsage(data);
+          if (data.planInterval === "annual" || data.planInterval === "monthly") {
+            setInterval(data.planInterval);
+          }
+        }
+      })
+      .catch(() => setUsage(null));
+  }, [session?.user]);
+
+  function isCurrentPlan(planId: PlanId): boolean {
+    if (!usage) return false;
+    if (planId === "free") return usage.plan === "free";
+    return usage.plan === planId && usage.planInterval === interval;
+  }
 
   async function handlePaidPlan(planId: PlanId) {
     if (!session?.user) {
       router.push("/signup");
       return;
     }
+    if (isCurrentPlan(planId)) return;
+
     setLoading(planId);
     try {
       const res = await fetch("/api/billing/checkout", {
@@ -61,6 +95,17 @@ export function PricingSection() {
       main: `$${plan.priceAnnualPerMonth}`,
       sub: `/mo billed $${plan.priceAnnualTotal}/year`,
     };
+  }
+
+  function planButtonLabel(planId: PlanId): string {
+    if (isCurrentPlan(planId)) return "Current plan";
+    if (planId === "free") {
+      return session?.user ? "Go to dashboard" : "Get started";
+    }
+    if (usage && usage.plan !== "free" && usage.plan === planId) {
+      return interval === "monthly" ? "Switch to monthly" : "Switch to annual";
+    }
+    return `Upgrade to ${PLANS[planId].name}`;
   }
 
   return (
@@ -99,6 +144,7 @@ export function PricingSection() {
             const plan = PLANS[planId];
             const price = displayPrice(planId);
             const highlighted = planId === "pro";
+            const current = isCurrentPlan(planId);
 
             return (
               <div
@@ -107,11 +153,19 @@ export function PricingSection() {
                   "flex flex-col rounded-2xl border p-6 text-left shadow-sm",
                   highlighted
                     ? "border-primary shadow-md shadow-primary/10"
-                    : "border-border/70 bg-card"
+                    : "border-border/70 bg-card",
+                  current && "ring-2 ring-primary/30"
                 )}
               >
                 <div className="mb-4">
-                  <h3 className="text-lg font-semibold">{plan.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold">{plan.name}</h3>
+                    {current && (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        Current
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-2 flex items-baseline gap-1">
                     <span className="text-3xl font-bold tracking-tight">{price.main}</span>
                     <span className="text-sm text-muted-foreground">{price.sub}</span>
@@ -128,17 +182,29 @@ export function PricingSection() {
                 </ul>
 
                 {planId === "free" ? (
-                  <Button asChild className="w-full rounded-full" variant={highlighted ? "default" : "outline"}>
-                    <Link href={session?.user ? "/dashboard" : "/signup"}>Get started</Link>
-                  </Button>
+                  current ? (
+                    <Button className="w-full rounded-full" variant="outline" disabled>
+                      Current plan
+                    </Button>
+                  ) : (
+                    <Button
+                      asChild
+                      className="w-full rounded-full"
+                      variant={highlighted ? "default" : "outline"}
+                    >
+                      <Link href={session?.user ? "/dashboard" : "/signup"}>
+                        {planButtonLabel(planId)}
+                      </Link>
+                    </Button>
+                  )
                 ) : (
                   <Button
                     className="w-full rounded-full"
                     variant={highlighted ? "default" : "outline"}
-                    disabled={!!loading}
+                    disabled={current || !!loading}
                     onClick={() => handlePaidPlan(planId)}
                   >
-                    {loading === planId ? "Redirecting…" : `Upgrade to ${plan.name}`}
+                    {loading === planId ? "Redirecting…" : planButtonLabel(planId)}
                   </Button>
                 )}
               </div>

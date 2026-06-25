@@ -46,9 +46,9 @@ export function isLemonSubscriptionEntitled(subscription: LemonSubscription): bo
 
 export function mapLemonSubscriptionStatus(
   status: string
-): "active" | "canceled" | "past_due" | null {
+): "active" | "canceled" | "cancelled" | "past_due" | null {
   if (status === "active" || status === "on_trial" || status === "paused") return "active";
-  if (status === "cancelled") return "active";
+  if (status === "cancelled") return "cancelled";
   if (status === "past_due" || status === "unpaid") return "past_due";
   if (status === "expired") return "canceled";
   return null;

@@ -152,3 +152,11 @@ export async function listSubscriptionsByCustomer(customerId: string): Promise<L
   );
   return response.data ?? [];
 }
+
+export async function cancelSubscription(subscriptionId: string): Promise<LemonSubscription> {
+  const response = await lemonFetch<LemonApiResponse<LemonSubscription>>(
+    `/subscriptions/${subscriptionId}`,
+    { method: "DELETE" }
+  );
+  return response.data;
+}

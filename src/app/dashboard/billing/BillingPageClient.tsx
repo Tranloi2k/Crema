@@ -14,6 +14,7 @@ interface UsageData {
   planInterval: string | null;
   planStatus: string | null;
   planCurrentPeriodEnd: number | null;
+  hasSubscription: boolean;
   templateCount: number;
   limits: {
     maxTemplates: number | null;
@@ -35,6 +36,8 @@ export default function BillingPageClient() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState<string | null>(null);
 
   const returningFromCheckout = searchParams.get("success") === "1";
 
@@ -85,6 +88,45 @@ export default function BillingPageClient() {
     };
   }, [returningFromCheckout]);
 
+  async function handleCancel() {
+    if (
+      !window.confirm(
+        "Cancel your subscription? You will keep access until the end of the current billing period."
+      )
+    ) {
+      return;
+    }
+
+    setCancelLoading(true);
+    setCancelMessage(null);
+    try {
+      const res = await fetch("/api/billing/cancel", { method: "POST" });
+      const data = await parseJsonResponse<{
+        billing?: UsageData;
+        endsAt?: string;
+        error?: string;
+      }>(res);
+
+      if (!res.ok || !data) {
+        setCancelMessage(data?.error ?? "Could not cancel subscription.");
+        return;
+      }
+
+      if (data.billing) setUsage(data.billing);
+      if (data.endsAt) {
+        setCancelMessage(
+          `Subscription canceled. Access continues until ${new Date(data.endsAt).toLocaleDateString()}.`
+        );
+      } else {
+        setCancelMessage("Subscription canceled.");
+      }
+    } catch {
+      setCancelMessage("Could not cancel subscription. Please try again.");
+    } finally {
+      setCancelLoading(false);
+    }
+  }
+
   async function openPortal() {
     setPortalLoading(true);
     try {
@@ -106,6 +148,7 @@ export default function BillingPageClient() {
 
   const plan = usage?.plan ?? "free";
   const planInfo = PLANS[plan];
+  const isCanceled = usage?.planStatus === "cancelled";
   const templateLimit = usage?.limits.maxTemplates;
   const templateLabel =
     templateLimit == null
@@ -148,7 +191,13 @@ export default function BillingPageClient() {
             )}
             {usage?.planCurrentPeriodEnd && (
               <p className="text-sm text-muted-foreground">
-                Renews {new Date(usage.planCurrentPeriodEnd).toLocaleDateString()}
+                {isCanceled ? "Access until" : "Renews"}{" "}
+                {new Date(usage.planCurrentPeriodEnd).toLocaleDateString()}
+              </p>
+            )}
+            {isCanceled && (
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                Your subscription is set to cancel at the end of this period.
               </p>
             )}
           </div>
@@ -171,12 +220,28 @@ export default function BillingPageClient() {
             )}
           </div>
 
+          {cancelMessage && (
+            <p className="rounded-xl border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+              {cancelMessage}
+            </p>
+          )}
+
           <div className="flex flex-wrap gap-2">
+            {plan !== "free" && usage?.hasSubscription && !isCanceled && (
+              <Button
+                variant="outline"
+                className="rounded-full text-destructive hover:text-destructive"
+                disabled={cancelLoading || portalLoading}
+                onClick={handleCancel}
+              >
+                {cancelLoading ? "Canceling…" : "Cancel subscription"}
+              </Button>
+            )}
             {plan !== "free" && (
               <Button
                 variant="outline"
                 className="rounded-full"
-                disabled={portalLoading}
+                disabled={portalLoading || cancelLoading}
                 onClick={openPortal}
               >
                 {portalLoading ? "Opening…" : "Manage subscription"}
