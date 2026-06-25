@@ -10,15 +10,11 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { users, accounts, sessions, verificationTokens } from "@/lib/db/schema";
 import { normalizeEmail, verifyPassword } from "@/lib/auth/password";
+import { isDevBypassEnabled } from "@/lib/auth/devBypass";
 
 const hasGoogle = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
 const hasGithub = !!process.env.GITHUB_ID && !!process.env.GITHUB_SECRET;
 
-// Temporary dev-only bypass: lets the builder be exercised end-to-end without
-// going through real OAuth. Stays available alongside Google/GitHub in dev
-// (handy for quick testing) but is never active in production. Safe to
-// delete once it's no longer needed.
-const DEV_BYPASS_ENABLED = process.env.NODE_ENV === "development";
 const DEV_USER = { id: "dev-user", name: "Dev User", email: "dev@local" };
 
 async function ensureDevUser() {
@@ -64,6 +60,7 @@ function createAuthAdapter(): Adapter {
 
 export const authOptions: NextAuthOptions = {
   adapter: createAuthAdapter(),
+  secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
   pages: { signIn: "/login", error: "/login" },
   debug: process.env.NODE_ENV === "development",
@@ -115,7 +112,7 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-    ...(DEV_BYPASS_ENABLED
+    ...(isDevBypassEnabled()
       ? [
           CredentialsProvider({
             id: "dev-bypass",
@@ -131,6 +128,7 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ account }) {
+      if (account?.provider === "dev-bypass" && !isDevBypassEnabled()) return false;
       if (account?.provider === "google" && !hasGoogle) return false;
       if (account?.provider === "github" && !hasGithub) return false;
       return true;
@@ -157,5 +155,5 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  ...(DEV_BYPASS_ENABLED ? { allowDangerousEmailAccountLinking: true } : {}),
+  ...(isDevBypassEnabled() ? { allowDangerousEmailAccountLinking: true } : {}),
 };

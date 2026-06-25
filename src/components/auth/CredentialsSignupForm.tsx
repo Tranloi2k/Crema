@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function CredentialsSignupForm() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,8 +53,7 @@ export function CredentialsSignupForm() {
         return;
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      window.location.assign("/dashboard");
     } catch {
       setError("Could not create account. Please try again.");
     } finally {

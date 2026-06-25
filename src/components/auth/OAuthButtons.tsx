@@ -5,8 +5,6 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const devBypassAvailable = process.env.NODE_ENV === "development";
-
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" aria-hidden>
@@ -64,7 +62,7 @@ export function OAuthButtons() {
 
   const showGoogle = !!providers?.google;
   const showGithub = !!providers?.github;
-  const showDevBypass = devBypassAvailable && !!providers?.["dev-bypass"];
+  const showDevBypass = !!providers?.["dev-bypass"];
   const loadingProviders = providers === null;
 
   async function handleSignIn(provider: string) {
