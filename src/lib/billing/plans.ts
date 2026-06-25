@@ -59,6 +59,21 @@ export function planRank(planId: PlanId): number {
   return ranks[planId];
 }
 
+/** Monthly vs annual savings for paid plans. */
+export function annualSavings(planId: PlanId) {
+  if (planId === "free") return null;
+  const plan = PLANS[planId];
+  const monthlyYearly = plan.priceMonthly * 12;
+  const saved = monthlyYearly - plan.priceAnnualTotal;
+  if (saved <= 0) return null;
+  return {
+    saved,
+    percent: Math.round((saved / monthlyYearly) * 100),
+    annualPerMonth: plan.priceAnnualPerMonth,
+    annualTotal: plan.priceAnnualTotal,
+  };
+}
+
 export function lemonVariantId(planId: PlanId, interval: PlanInterval): string | null {
   if (planId === "free") return null;
   const envKey =

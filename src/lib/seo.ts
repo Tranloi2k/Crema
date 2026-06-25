@@ -44,7 +44,7 @@ export function buildPageMetadata({
   noIndex = false,
   keywords = DEFAULT_KEYWORDS,
 }: PageMetadataOptions = {}): Metadata {
-  const pageTitle = title ?? `${SITE_NAME} — ${SITE_TAGLINE}`;
+  const pageTitle = title ?? `${SITE_NAME} - ${SITE_TAGLINE}`;
   const url = absoluteUrl(path);
 
   return {

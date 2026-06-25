@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PLANS, type PlanId, type PlanInterval } from "@/lib/billing/plans";
+import { PLANS, annualSavings, type PlanId, type PlanInterval } from "@/lib/billing/plans";
 import { parseJsonResponse } from "@/lib/parseJsonResponse";
 import { cn } from "@/lib/utils";
 
@@ -25,36 +25,56 @@ const FEATURES: Record<PlanId, string[]> = {
   ],
 };
 
-interface UsageSummary {
+export interface PricingUsageSummary {
   plan: PlanId;
   planInterval: string | null;
   planStatus: string | null;
 }
 
-export function PricingSection() {
-  const { data: session } = useSession();
+interface PricingSectionProps {
+  initialUsage?: PricingUsageSummary | null;
+}
+
+const PAID_PLANS: PlanId[] = ["pro", "pro_plus"];
+
+export function PricingSection({ initialUsage = null }: PricingSectionProps) {
+  const { data: session, status } = useSession();
   const router = useRouter();
-  const [interval, setInterval] = useState<BillingInterval>("monthly");
-  const [loading, setLoading] = useState<PlanId | null>(null);
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [interval, setInterval] = useState<BillingInterval>(
+    initialUsage?.planInterval === "annual" ? "annual" : "monthly"
+  );
+  const [checkoutLoading, setCheckoutLoading] = useState<PlanId | null>(null);
+  const [usage, setUsage] = useState<PricingUsageSummary | null>(initialUsage);
+
+  const usageLoading = status === "loading" || (!!session?.user && usage === null);
 
   useEffect(() => {
+    if (status === "loading") return;
+
     if (!session?.user) {
       setUsage(null);
       return;
     }
+
+    let cancelled = false;
     fetch("/api/billing/usage")
       .then(async (res) => {
-        const data = await parseJsonResponse<UsageSummary>(res);
-        if (res.ok && data?.plan) {
+        const data = await parseJsonResponse<PricingUsageSummary>(res);
+        if (!cancelled && res.ok && data?.plan) {
           setUsage(data);
           if (data.planInterval === "annual" || data.planInterval === "monthly") {
             setInterval(data.planInterval);
           }
         }
       })
-      .catch(() => setUsage(null));
-  }, [session?.user]);
+      .catch(() => {
+        if (!cancelled) setUsage(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user, status]);
 
   function isCurrentPlan(planId: PlanId): boolean {
     if (!usage) return false;
@@ -67,9 +87,9 @@ export function PricingSection() {
       router.push("/signup");
       return;
     }
-    if (isCurrentPlan(planId)) return;
+    if (usageLoading || isCurrentPlan(planId)) return;
 
-    setLoading(planId);
+    setCheckoutLoading(planId);
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
@@ -81,7 +101,7 @@ export function PricingSection() {
         window.location.href = data.url;
       }
     } finally {
-      setLoading(null);
+      setCheckoutLoading(null);
     }
   }
 
@@ -98,6 +118,7 @@ export function PricingSection() {
   }
 
   function planButtonLabel(planId: PlanId): string {
+    if (usageLoading && planId !== "free") return "Loading…";
     if (isCurrentPlan(planId)) return "Current plan";
     if (planId === "free") {
       return session?.user ? "Go to dashboard" : "Get started";
@@ -139,12 +160,57 @@ export function PricingSection() {
           </button>
         </div>
 
+        {interval === "monthly" && (
+          <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 text-left sm:text-center">
+            <p className="text-sm font-medium text-foreground">Save with annual billing</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pay yearly and get a lower effective monthly rate. Same features, less per month.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {PAID_PLANS.map((planId) => {
+                const plan = PLANS[planId];
+                const savings = annualSavings(planId);
+                if (!savings) return null;
+                return (
+                  <div
+                    key={planId}
+                    className="rounded-xl border border-border/60 bg-background/80 px-4 py-3 text-sm"
+                  >
+                    <p className="font-medium">{plan.name}</p>
+                    <p className="mt-1 text-muted-foreground">
+                      <span className="line-through">${plan.priceMonthly}/mo</span>
+                      {" → "}
+                      <span className="font-medium text-foreground">
+                        ${savings.annualPerMonth}/mo
+                      </span>{" "}
+                      billed ${savings.annualTotal}/yr
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-primary">
+                      Save ${savings.saved}/year ({savings.percent}% off)
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setInterval("annual")}
+              className="mt-4 text-sm font-medium text-primary hover:underline"
+            >
+              Switch to annual pricing →
+            </button>
+          </div>
+        )}
+
         <div className="mt-10 grid gap-6 md:grid-cols-3">
           {PLAN_ORDER.map((planId) => {
             const plan = PLANS[planId];
             const price = displayPrice(planId);
             const highlighted = planId === "pro";
-            const current = isCurrentPlan(planId);
+            const current = !usageLoading && isCurrentPlan(planId);
+            const buttonDisabled =
+              planId === "free" ? current : current || !!checkoutLoading || usageLoading;
+            const savings = interval === "monthly" ? annualSavings(planId) : null;
 
             return (
               <div
@@ -170,6 +236,12 @@ export function PricingSection() {
                     <span className="text-3xl font-bold tracking-tight">{price.main}</span>
                     <span className="text-sm text-muted-foreground">{price.sub}</span>
                   </div>
+                  {savings && (
+                    <p className="mt-2 text-xs text-primary">
+                      Annual: ${savings.annualPerMonth}/mo · save ${savings.saved}/yr (
+                      {savings.percent}% off)
+                    </p>
+                  )}
                 </div>
 
                 <ul className="mb-6 flex-1 space-y-2">
@@ -201,10 +273,10 @@ export function PricingSection() {
                   <Button
                     className="w-full rounded-full"
                     variant={highlighted ? "default" : "outline"}
-                    disabled={current || !!loading}
+                    disabled={buttonDisabled}
                     onClick={() => handlePaidPlan(planId)}
                   >
-                    {loading === planId ? "Redirecting…" : planButtonLabel(planId)}
+                    {checkoutLoading === planId ? "Redirecting…" : planButtonLabel(planId)}
                   </Button>
                 )}
               </div>

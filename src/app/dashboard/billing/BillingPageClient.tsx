@@ -35,7 +35,6 @@ export default function BillingPageClient() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
-  const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelMessage, setCancelMessage] = useState<string | null>(null);
 
@@ -124,17 +123,6 @@ export default function BillingPageClient() {
       setCancelMessage("Could not cancel subscription. Please try again.");
     } finally {
       setCancelLoading(false);
-    }
-  }
-
-  async function openPortal() {
-    setPortalLoading(true);
-    try {
-      const res = await fetch("/api/billing/portal", { method: "POST" });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } finally {
-      setPortalLoading(false);
     }
   }
 
@@ -231,20 +219,10 @@ export default function BillingPageClient() {
               <Button
                 variant="outline"
                 className="rounded-full text-destructive hover:text-destructive"
-                disabled={cancelLoading || portalLoading}
+                disabled={cancelLoading}
                 onClick={handleCancel}
               >
                 {cancelLoading ? "Canceling…" : "Cancel subscription"}
-              </Button>
-            )}
-            {plan !== "free" && (
-              <Button
-                variant="outline"
-                className="rounded-full"
-                disabled={portalLoading || cancelLoading}
-                onClick={openPortal}
-              >
-                {portalLoading ? "Opening…" : "Manage subscription"}
               </Button>
             )}
             <Button asChild className="rounded-full">
