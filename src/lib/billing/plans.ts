@@ -1,0 +1,86 @@
+export type PlanId = "free" | "pro" | "pro_plus";
+export type PlanInterval = "monthly" | "annual";
+
+export interface PlanLimits {
+  id: PlanId;
+  name: string;
+  priceMonthly: number;
+  priceAnnualPerMonth: number;
+  priceAnnualTotal: number;
+  maxTemplates: number | null;
+  maxImagesPerTemplate: number;
+  support: boolean;
+}
+
+export const PLANS: Record<PlanId, PlanLimits> = {
+  free: {
+    id: "free",
+    name: "Free",
+    priceMonthly: 0,
+    priceAnnualPerMonth: 0,
+    priceAnnualTotal: 0,
+    maxTemplates: 3,
+    maxImagesPerTemplate: 0,
+    support: false,
+  },
+  pro: {
+    id: "pro",
+    name: "Pro",
+    priceMonthly: 5,
+    priceAnnualPerMonth: 3,
+    priceAnnualTotal: 36,
+    maxTemplates: 10,
+    maxImagesPerTemplate: 2,
+    support: false,
+  },
+  pro_plus: {
+    id: "pro_plus",
+    name: "Pro+",
+    priceMonthly: 6,
+    priceAnnualPerMonth: 4,
+    priceAnnualTotal: 48,
+    maxTemplates: null,
+    maxImagesPerTemplate: 5,
+    support: true,
+  },
+};
+
+export function isPlanId(value: string): value is PlanId {
+  return value === "free" || value === "pro" || value === "pro_plus";
+}
+
+export function getPlanLimits(planId: string): PlanLimits {
+  if (isPlanId(planId)) return PLANS[planId];
+  return PLANS.free;
+}
+
+export function planRank(planId: PlanId): number {
+  const ranks: Record<PlanId, number> = { free: 0, pro: 1, pro_plus: 2 };
+  return ranks[planId];
+}
+
+export function stripePriceId(planId: PlanId, interval: PlanInterval): string | null {
+  if (planId === "free") return null;
+  const envKey =
+    planId === "pro"
+      ? interval === "monthly"
+        ? "STRIPE_PRICE_PRO_MONTHLY"
+        : "STRIPE_PRICE_PRO_ANNUAL"
+      : interval === "monthly"
+        ? "STRIPE_PRICE_PRO_PLUS_MONTHLY"
+        : "STRIPE_PRICE_PRO_PLUS_ANNUAL";
+  return process.env[envKey] ?? null;
+}
+
+export function planFromStripePriceId(priceId: string): { planId: PlanId; interval: PlanInterval } | null {
+  const mapping: [string | undefined, PlanId, PlanInterval][] = [
+    [process.env.STRIPE_PRICE_PRO_MONTHLY, "pro", "monthly"],
+    [process.env.STRIPE_PRICE_PRO_ANNUAL, "pro", "annual"],
+    [process.env.STRIPE_PRICE_PRO_PLUS_MONTHLY, "pro_plus", "monthly"],
+    [process.env.STRIPE_PRICE_PRO_PLUS_ANNUAL, "pro_plus", "annual"],
+  ];
+  for (const [envPrice, planId, interval] of mapping) {
+    if (envPrice && envPrice === priceId) return { planId, interval };
+  }
+  return null;
+}

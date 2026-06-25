@@ -1,0 +1,93 @@
+# Crema MVP — Drag-and-drop Email Builder
+
+## Context
+`C:\Users\admin\Code\Crema` is an empty directory. The goal is to scaffold a working MVP end-to-end: drag-and-drop email builder (5 block types), properties panel editing, real-time preview, inline-CSS HTML export, auto-saved templates with a list view, and Google/GitHub auth — built with the exact stack the user specified. Per user's answers: build the **full MVP now** with **placeholder env vars** (user already has real Turso/OAuth/Cloudinary/Resend accounts and will paste keys into `.env.local` after the code is done — no live service calls need to succeed during this session).
+
+## Tech stack (as specified)
+- Next.js 14 (App Router) + TypeScript + Tailwind + shadcn/ui (button, input, label, tabs, dialog)
+- Zustand (editor state), @dnd-kit (drag & drop), TipTap (rich text for Text block), lucide-react (icons)
+- Turso (libSQL) via Drizzle ORM, NextAuth.js (Auth.js v4, Google + GitHub providers, Drizzle adapter)
+- Cloudinary (image upload), Resend (test email send)
+- Deployed target: Vercel (no action needed now beyond making it deploy-ready)
+
+## Project structure
+```
+crema/
+  drizzle/                       # migrations
+  src/
+    app/
+      (auth)/login/page.tsx
+      dashboard/page.tsx                  # template list
+      editor/[templateId]/page.tsx        # builder
+      api/
+        auth/[...nextauth]/route.ts
+        templates/route.ts                # GET list, POST create
+        templates/[id]/route.ts           # GET/PATCH(autosave)/DELETE
+        upload/route.ts                   # Cloudinary upload signature/proxy
+        send-test/route.ts                # Resend send
+    components/
+      ui/...                              # shadcn generated
+      builder/
+        Canvas.tsx                        # 600px dnd-kit sortable area
+        BlockRenderer.tsx                 # switches on block.type
+        blocks/TextBlock.tsx, ImageBlock.tsx, ButtonBlock.tsx, DividerBlock.tsx, SpacerBlock.tsx
+        PropertiesPanel.tsx               # right sidebar, per-type editors
+        BlockPalette.tsx                  # left sidebar, drag sources
+        Toolbar.tsx                       # save status, preview toggle, export, send test
+        PreviewModal.tsx                  # real-time iframe preview
+      dashboard/TemplateList.tsx, TemplateCard.tsx
+    lib/
+      db/schema.ts, db/client.ts          # Drizzle + libSQL
+      auth.ts                             # NextAuth config
+      export/toHtml.ts                    # block[] -> table-based inline-CSS HTML
+      cloudinary.ts, resend.ts
+      store/editorStore.ts                # Zustand store
+      types.ts                            # Block, BlockType, Template types
+    middleware.ts                          # protect /dashboard, /editor
+  .env.example
+```
+
+## Data model (Drizzle + Turso)
+- `users`, `accounts`, `sessions`, `verification_tokens` — standard Auth.js Drizzle adapter tables.
+- `templates`: `id`, `userId`, `name`, `content` (JSON-stringified `Block[]`), `createdAt`, `updatedAt`.
+
+## Editor state (Zustand) — `editorStore.ts`
+- `blocks: Block[]`, `selectedBlockId: string | null`
+- actions: `addBlock(type, index)`, `removeBlock(id)`, `updateBlock(id, partial)`, `reorderBlocks(activeId, overId)`, `selectBlock(id)`, `setBlocks` (for load), plus `templateId`/`name`/dirty flag for autosave.
+- `Block` shape: `{ id, type: 'text'|'image'|'button'|'divider'|'spacer', content: {...}, style: {...} }` — fields vary per type (e.g. text: `html` from TipTap; image: `src, alt, width, link`; button: `label, href, bgColor, textColor, borderRadius`; divider: `color, thickness`; spacer: `height`).
+
+## Drag & drop (@dnd-kit)
+- `BlockPalette` items are draggable sources (5 static cards); `Canvas` is a `SortableContext` over `blocks`. Dropping a palette item inside the canvas calls `addBlock`; reordering existing blocks calls `reorderBlocks`. Use `DndContext` at the page level wrapping both palette and canvas.
+
+## Text block (TipTap)
+- Minimal toolbar: bold, italic, link, alignment. Stored as HTML string in `block.content.html`, synced into the store on every edit (debounced) so Canvas/Preview re-render live.
+
+## Properties panel
+- Tabs (shadcn `Tabs`): "Content" and "Style" per selected block, fields driven by block type (text alignment/padding/color, image src/alt/width/link, button label/link/colors/radius, divider color/thickness, spacer height). No selection → empty state.
+
+## Preview
+- Reuses the same `BlockRenderer` + `toHtml()` output rendered in a sandboxed `iframe` (srcDoc) inside `PreviewModal`, so what's previewed matches the export exactly.
+
+## Export (`lib/export/toHtml.ts`)
+- Pure function `blocksToHtml(blocks: Block[]): string` producing a `<table role="presentation" width="600">`-based layout, all styles inlined per cell (no external `<style>` blocks), VML/MSO-safe basics (e.g. button as table-cell with bgcolor, not `<button>`). Exposed via a "Export HTML" toolbar action that downloads a `.html` file (`Blob` + anchor) — no server round-trip needed for export itself.
+
+## Persistence / autosave
+- `editorStore` exposes `dirty`; a `useAutosave` hook in the editor page debounces (~1.5s) and calls `PATCH /api/templates/[id]` with the serialized `blocks`. New templates are created via `POST /api/templates` (redirects into `/editor/[id]`) from the dashboard "New Template" button.
+- `/dashboard` lists templates (name, updatedAt, thumbnail-less card for MVP) with create/delete/rename (shadcn `Dialog`).
+
+## Auth
+- NextAuth v4 App Router setup (`app/api/auth/[...nextauth]/route.ts` + `lib/auth.ts` using `DrizzleAdapter`), Google + GitHub providers reading `GOOGLE_CLIENT_ID/SECRET`, `GITHUB_ID/SECRET` from env (placeholders in `.env.example`). `middleware.ts` guards `/dashboard` and `/editor/*`, redirecting unauthenticated users to `/login`.
+- Since real OAuth keys aren't available yet, this session verifies the auth *wiring* (routes compile, redirect behavior, session usage) rather than a live Google/GitHub login — noted explicitly to the user.
+
+## Image upload & test email
+- `/api/upload`: receives a file from `ImageBlock`'s properties panel, uploads to Cloudinary via signed upload (`CLOUDINARY_*` env), returns the secure URL.
+- `/api/send-test`: takes the current export HTML + a recipient email, sends via Resend (`RESEND_API_KEY`).
+- Both routes are fully implemented but will only function once the user supplies real keys.
+
+## Temporary dev auth bypass
+- In `lib/auth.ts` / `middleware.ts`, when `NODE_ENV === 'development'` AND `GOOGLE_CLIENT_ID` is unset, inject a fake static session (`dev@local`, fixed id) so `/dashboard` and `/editor/*` are reachable without real OAuth. Guard this clearly with an env check (never active when real keys are present, never active in production) and mark it with a one-line comment + a note in `.env.example` so it's obviously temporary. Remove or leave inert once the user adds real `GOOGLE_CLIENT_ID`/`GITHUB_ID`.
+
+## Verification (this session)
+- `npm run build` and `npm run lint` pass.
+- `npm run dev`, then drive the app in-browser (Claude_in_Chrome): dev-bypass lands on `/dashboard` → create a template → drag all 5 block types onto the 600px canvas → edit content/style in the properties panel for each → confirm preview matches → export HTML and sanity-check it's table-based with inlined styles → confirm autosave (reload page, blocks persist via Turso).
+- Image upload and test-email send will be coded but only smoke-tested for correct request wiring (cannot complete without real Cloudinary/Resend keys) — tell the user explicitly these two need their real keys to fully verify.

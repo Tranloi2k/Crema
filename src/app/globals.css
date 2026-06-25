@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 243 75% 95%;
+    --accent-foreground: 243 70% 45%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 243 75% 59%;
+    --radius: 0.625rem;
+  }
+  .dark {
+    --background: 222 47% 5%;
+    --foreground: 210 20% 98%;
+    --card: 222 40% 8%;
+    --card-foreground: 210 20% 98%;
+    --popover: 222 40% 8%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 243 75% 66%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 30% 15%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 222 30% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 243 45% 22%;
+    --accent-foreground: 243 80% 85%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 25% 18%;
+    --input: 222 25% 18%;
+    --ring: 243 75% 66%;
+    --radius: 0.625rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Fixed-height text frames (Framer-style): frame clips; content aligns inside. */
+.text-block-editor {
+  width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  flex-shrink: 0;
+}
+
+.text-block-editor .tiptap {
+  outline: none;
+}
+
+.text-block-editor .tiptap p {
+  margin: 0;
+}
+
+.text-block-editor .tiptap > * + * {
+  margin-top: 0.5em;
+}
+
+/* ---- Marketing site helpers ---- */
+
+/* Brand gradient text for logo / headline accents */
+.brand-gradient-text {
+  background-image: linear-gradient(
+    100deg,
+    hsl(243 75% 59%),
+    hsl(263 70% 60%) 55%,
+    hsl(199 89% 55%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Soft radial glow used behind the hero */
+.hero-glow {
+  background:
+    radial-gradient(60% 50% at 50% 0%, hsl(243 75% 59% / 0.18), transparent 70%),
+    radial-gradient(40% 40% at 85% 10%, hsl(199 89% 55% / 0.12), transparent 70%),
+    radial-gradient(40% 40% at 15% 15%, hsl(263 70% 60% / 0.12), transparent 70%);
+}
+
+/* Subtle grid background */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, hsl(var(--border) / 0.6) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(var(--border) / 0.6) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 60%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 60%, transparent 100%);
+}
