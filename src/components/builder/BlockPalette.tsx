@@ -10,7 +10,6 @@ import {
   MoveVertical,
   Rows3,
   Share2,
-  Eye,
   Send,
 } from "lucide-react";
 import type { BlockType } from "@/lib/types";
@@ -103,13 +102,7 @@ export function BlockPalette() {
 }
 
 /** Horizontal block palette — full-width bar above the editor columns. */
-export function BlockPaletteBar({
-  onPreview,
-  readOnly = false,
-}: {
-  onPreview: () => void;
-  readOnly?: boolean;
-}) {
+export function BlockPaletteBar() {
   const name = useEditorStore((s) => s.name);
   const root = useEditorStore((s) => s.root);
   const [sending, setSending] = useState(false);
@@ -122,7 +115,11 @@ export function BlockPaletteBar({
       await fetch("/api/send-test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: testEmail, html: blocksToHtml(root), subject: name }),
+        body: JSON.stringify({
+          to: testEmail,
+          html: blocksToHtml(root),
+          subject: name,
+        }),
       });
     } finally {
       setSending(false);
@@ -131,35 +128,26 @@ export function BlockPaletteBar({
 
   return (
     <div className="flex items-center justify-between gap-4 overflow-x-auto border-b border-border/60 bg-background px-4 py-2">
-      {!readOnly && (
-        <div className="flex items-center gap-2">
-          {PALETTE_ITEMS.map((item) => (
-            <PaletteItem key={item.type} orientation="bar" {...item} />
-          ))}
-        </div>
-      )}
-      <div className={cn("flex shrink-0 items-center gap-2", readOnly && "ml-auto")}>
-        {!readOnly && (
-          <>
-            <Input
-              placeholder="test@email.com"
-              value={testEmail}
-              onChange={(e) => setTestEmail(e.target.value)}
-              className="h-8 w-44 rounded-full"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-full"
-              onClick={handleSendTest}
-              disabled={sending}
-            >
-              <Send className="mr-1.5 h-4 w-4" /> Send test
-            </Button>
-          </>
-        )}
-        <Button variant="outline" size="sm" className="rounded-full" onClick={onPreview}>
-          <Eye className="mr-1.5 h-4 w-4" /> Preview
+      <div className="flex items-center gap-2">
+        {PALETTE_ITEMS.map((item) => (
+          <PaletteItem key={item.type} orientation="bar" {...item} />
+        ))}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Input
+          placeholder="test@email.com"
+          value={testEmail}
+          onChange={(e) => setTestEmail(e.target.value)}
+          className="h-8 w-44 rounded-full"
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full"
+          onClick={handleSendTest}
+          disabled={sending}
+        >
+          <Send className="mr-1.5 h-4 w-4" /> Send test
         </Button>
       </div>
     </div>

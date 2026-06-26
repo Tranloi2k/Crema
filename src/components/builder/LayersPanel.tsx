@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useDroppable } from "@dnd-kit/core";
+import {
+  DndContext,
+  PointerSensor,
+  pointerWithin,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -17,11 +25,20 @@ import {
 } from "lucide-react";
 import type { Block, StackBlock } from "@/lib/types";
 import { SOCIAL_PLATFORMS } from "@/lib/social";
-import { useEditorStore } from "@/lib/store/editorStore";
+import { useEditorStore, findBlock } from "@/lib/store/editorStore";
 import { useDropIndicator } from "@/lib/hooks/useDropIndicator";
+import { resolveDropTarget } from "@/lib/dnd/resolveDrop";
 import { layerNestedPadding, layerRowPadding } from "@/lib/layers/indent";
 import { BlockContextMenu } from "@/components/builder/BlockContextMenu";
 import { cn } from "@/lib/utils";
+
+// Direct children array of a container (root or a Stack's id), used by the
+// Layers panel's isolated drop resolution.
+function getContainerArray(root: StackBlock, containerId: string): Block[] {
+  if (containerId === root.id) return root.children;
+  const found = findBlock(root, containerId);
+  return found && found.type === "stack" ? found.children : [];
+}
 
 const ICONS: Record<Block["type"], React.ComponentType<{ className?: string }>> = {
   text: Type,
@@ -211,17 +228,46 @@ function LayerStackChildren({ block, depth }: { block: StackBlock; depth: number
 
 export function LayersPanel() {
   const root = useEditorStore((s) => s.root);
+  const reorderBlocks = useEditorStore((s) => s.reorderBlocks);
+  const moveBlock = useEditorStore((s) => s.moveBlock);
+
+  // The Layers panel runs its own DndContext, isolated from the canvas. Both
+  // render `useSortable({ id: block.id })` for every block, and dnd-kit requires
+  // unique ids per context — sharing one context made the canvas registration
+  // win, so layer rows were never hit (every hover read as "drop inside").
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active } = event;
+    const target = resolveDropTarget(event, root, (id) => getContainerArray(root, id));
+    if (!target) return;
+
+    const { containerId, index, appendIntoStack } = target;
+    const activeData = active.data.current as { containerId?: string } | undefined;
+    if (!activeData?.containerId || active.id === event.over?.id) return;
+
+    if (activeData.containerId === containerId && !appendIntoStack) {
+      reorderBlocks(containerId, active.id as string, event.over!.id as string);
+      return;
+    }
+
+    moveBlock(active.id as string, containerId, index);
+  }
 
   return (
-    <div className="p-2">
-      <LayerRow
-        block={root}
-        depth={0}
-        containerId={root.id}
-        index={-1}
-        canDrag={false}
-        isRoot
-      />
-    </div>
+    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={handleDragEnd}>
+      <div className="p-2">
+        <LayerRow
+          block={root}
+          depth={0}
+          containerId={root.id}
+          index={-1}
+          canDrag={false}
+          isRoot
+        />
+      </div>
+    </DndContext>
   );
 }
