@@ -21,7 +21,12 @@ export function useAutosave(templateId: string | null) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name, root }),
         });
-        if (res.ok) markSaved();
+        if (res.ok) {
+          markSaved();
+          // Fire-and-forget version checkpoint; the endpoint throttles so most
+          // saves are no-ops and history stays meaningful, not noisy.
+          fetch(`/api/templates/${templateId}/versions`, { method: "POST" }).catch(() => {});
+        }
       } catch {
         // Retry on next edit
       }

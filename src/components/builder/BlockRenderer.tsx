@@ -5,6 +5,7 @@ import { ButtonBlock } from "@/components/builder/blocks/ButtonBlock";
 import { DividerBlock } from "@/components/builder/blocks/DividerBlock";
 import { SpacerBlock } from "@/components/builder/blocks/SpacerBlock";
 import { StackBlock } from "@/components/builder/blocks/StackBlock";
+import { SocialBlock } from "@/components/builder/blocks/SocialBlock";
 
 export function BlockRenderer({
   block,
@@ -28,5 +29,7 @@ export function BlockRenderer({
       return <SpacerBlock block={block} />;
     case "stack":
       return <StackBlock block={block} />;
+    case "social":
+      return <SocialBlock block={block} compactWidth={compactWidth} />;
   }
 }

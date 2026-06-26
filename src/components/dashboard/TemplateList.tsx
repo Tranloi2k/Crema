@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SkeletonCard } from "@/components/ui/loader";
 import { TemplateCard } from "@/components/dashboard/TemplateCard";
+import { NewTemplateModal } from "@/components/dashboard/NewTemplateModal";
 import type { PlanId } from "@/lib/billing/plans";
 import type { StackBlock } from "@/lib/types";
 import { parseJsonResponse } from "@/lib/parseJsonResponse";
@@ -32,6 +33,7 @@ export function TemplateList() {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,17 +51,18 @@ export function TemplateList() {
   const atLimit =
     maxTemplates != null && (usage?.templateCount ?? 0) >= maxTemplates;
 
-  async function handleCreate() {
+  async function handleCreate(preset: string) {
     setCreating(true);
     setError(null);
     const res = await fetch("/api/templates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify(preset ? { preset } : {}),
     });
     const data = await res.json();
-    setCreating(false);
     if (!res.ok) {
+      setCreating(false);
+      setModalOpen(false);
       setError(data.error ?? "Could not create template.");
       return;
     }
@@ -87,13 +90,20 @@ export function TemplateList() {
           )}
         </div>
         <Button
-          onClick={handleCreate}
+          onClick={() => setModalOpen(true)}
           disabled={creating || atLimit || usage?.downgradeSelectionPending}
           className="rounded-full"
         >
           <Plus className="mr-1.5 h-4 w-4" /> New Template
         </Button>
       </div>
+
+      <NewTemplateModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onCreate={handleCreate}
+        creating={creating}
+      />
 
       {error && (
         <p className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">

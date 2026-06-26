@@ -1,4 +1,11 @@
-export type BlockType = "text" | "image" | "button" | "divider" | "spacer" | "stack";
+export type BlockType =
+  | "text"
+  | "image"
+  | "button"
+  | "divider"
+  | "spacer"
+  | "stack"
+  | "social";
 
 export interface BaseBlock {
   id: string;
@@ -301,13 +308,26 @@ export interface StackBlock extends BaseBlock {
   children: Block[];
 }
 
+export interface SocialBlock extends BaseBlock {
+  type: "social";
+  content: { platform: import("@/lib/social").SocialPlatform; href: string };
+  style: {
+    align: "left" | "center" | "right";
+    iconColor: string;
+    width: number | Dimension;
+    height: number | Dimension;
+    padding: number | Sides;
+  } & CommonStyle;
+}
+
 export type Block =
   | TextBlock
   | ImageBlock
   | ButtonBlock
   | DividerBlock
   | SpacerBlock
-  | StackBlock;
+  | StackBlock
+  | SocialBlock;
 
 export interface Template {
   id: string;

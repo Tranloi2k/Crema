@@ -9,6 +9,7 @@ import {
   Minus,
   MoveVertical,
   Rows3,
+  Share2,
   Eye,
   Send,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const PALETTE_ITEMS: {
   { type: "divider", label: "Divider", icon: Minus },
   { type: "spacer", label: "Spacer", icon: MoveVertical },
   { type: "stack", label: "Stack", icon: Rows3 },
+  { type: "social", label: "Social", icon: Share2 },
 ];
 
 const PALETTE_META = Object.fromEntries(

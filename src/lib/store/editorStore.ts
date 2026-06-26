@@ -176,6 +176,8 @@ interface EditorState {
 
   setZoom: (zoom: number) => void;
   loadTemplate: (templateId: string, name: string, root: StackBlock) => void;
+  /** Replaces the canvas with a restored version's content (kept dirty + undoable). */
+  loadVersion: (root: StackBlock, name?: string) => void;
   setName: (name: string) => void;
   setMergeTagProvider: (id: MergeTagProviderId) => void;
   registerTextEditor: (api: TextEditorApi | null) => void;
@@ -249,6 +251,16 @@ export const useEditorStore = create<EditorState>((set) => ({
       _histKey: null,
       _histTime: 0,
     }),
+
+  loadVersion: (root, name) =>
+    set((state) => ({
+      ...history(state),
+      root,
+      name: name ?? state.name,
+      selectedBlockId: null,
+      selectedBlockIds: [],
+      dirty: true,
+    })),
 
   setName: (name) => set({ name, dirty: true }),
 

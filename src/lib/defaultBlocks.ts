@@ -73,6 +73,22 @@ export function createBlock(type: BlockType): Block {
       };
     case "spacer":
       return { id, type, content: {}, style: { ...DEFAULT_COMMON_STYLE, height: dim(24) } };
+    case "social":
+      // One Social block = one icon. Add several blocks (e.g. inside a row Stack)
+      // to build an icon row. Sized via width/height like other blocks.
+      return {
+        id,
+        type,
+        content: { platform: "facebook", href: "https://facebook.com" },
+        style: {
+          ...DEFAULT_COMMON_STYLE,
+          align: "center",
+          iconColor: "#6b7280",
+          width: dim(32),
+          height: dim(32),
+          padding: 12,
+        },
+      };
     case "stack":
       return {
         id,

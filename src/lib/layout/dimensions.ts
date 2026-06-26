@@ -10,6 +10,8 @@ export function getBlockHeightDim(block: Block): Dimension {
       return toDimension(block.style.height, dim(0, "fit-content"));
     case "spacer":
       return toDimension(block.style.height, dim(24));
+    case "social":
+      return toDimension(block.style.height, dim(32));
     default:
       return dim(0, "fit-content");
   }
@@ -22,6 +24,7 @@ export function blockResizableAxes(block: Block): { width: boolean; height: bool
     case "image":
     case "button":
     case "stack":
+    case "social":
       return { width: true, height: true };
     case "spacer":
       return { width: false, height: true };
@@ -40,6 +43,8 @@ export function getBlockWidthDim(block: Block): Dimension | null {
       return toDimension(block.style.width, dim(0, "fit-content"));
     case "stack":
       return toDimension(block.style.width, dim(0, "fit-content"));
+    case "social":
+      return toDimension(block.style.width, dim(32));
     default:
       return null;
   }

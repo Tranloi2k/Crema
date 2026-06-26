@@ -79,4 +79,22 @@ export const templates = sqliteTable("templates", {
   createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
   locked: integer("locked", { mode: "boolean" }).notNull().default(false),
+  // Read-only public preview: when isPublic is true the template is viewable at
+  // /p/{publicSlug} without auth. The slug is unguessable and revoked on toggle-off.
+  publicSlug: text("publicSlug").unique(),
+  isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
+});
+
+// Periodic snapshots of a template's content so autosave (which overwrites the
+// live row) can't permanently lose good work. Capped per-template on insert.
+export const templateVersions = sqliteTable("template_versions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  templateId: text("templateId")
+    .notNull()
+    .references(() => templates.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  content: text("content").notNull(), // JSON-stringified StackBlock
+  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
 });

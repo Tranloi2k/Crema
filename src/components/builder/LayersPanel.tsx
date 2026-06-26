@@ -11,10 +11,12 @@ import {
   Minus,
   MoveVertical,
   Rows3,
+  Share2,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
 import type { Block, StackBlock } from "@/lib/types";
+import { SOCIAL_PLATFORMS } from "@/lib/social";
 import { useEditorStore } from "@/lib/store/editorStore";
 import { useDropIndicator } from "@/lib/hooks/useDropIndicator";
 import { layerNestedPadding, layerRowPadding } from "@/lib/layers/indent";
@@ -28,6 +30,7 @@ const ICONS: Record<Block["type"], React.ComponentType<{ className?: string }>> 
   divider: Minus,
   spacer: MoveVertical,
   stack: Rows3,
+  social: Share2,
 };
 
 function labelFor(block: Block): string {
@@ -47,6 +50,8 @@ function labelFor(block: Block): string {
       return "Spacer";
     case "stack":
       return "Stack";
+    case "social":
+      return SOCIAL_PLATFORMS[block.content.platform]?.label ?? "Social";
   }
 }
 

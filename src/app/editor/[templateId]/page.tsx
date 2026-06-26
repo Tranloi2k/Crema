@@ -149,7 +149,7 @@ export default function EditorPage() {
           This template is locked on your current plan. You can preview and export only.
         </div>
       )}
-      <Toolbar readOnly={readOnly} />
+      <Toolbar readOnly={readOnly} templateId={templateId} />
       <BlockPaletteBar onPreview={() => setPreviewOpen(true)} readOnly={readOnly} />
       <div className="flex flex-1 overflow-hidden">
         {!readOnly && (

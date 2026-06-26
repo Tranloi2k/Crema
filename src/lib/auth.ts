@@ -135,12 +135,18 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === "github" && !hasGithub) return false;
       return true;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.name = user.name;
         token.email = user.email;
         token.picture = user.image;
+      }
+      // Profile updates call useSession().update({ name }) — reflect it in the JWT
+      // so the new name shows without requiring a fresh sign-in.
+      if (trigger === "update" && session && typeof session === "object") {
+        const next = session as { name?: string };
+        if (typeof next.name === "string" && next.name) token.name = next.name;
       }
       return token;
     },

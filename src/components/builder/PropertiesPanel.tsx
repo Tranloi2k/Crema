@@ -5,6 +5,11 @@ import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/lib/store/editorStore";
+import {
+  SOCIAL_PLATFORMS,
+  SOCIAL_PLATFORM_LIST,
+  type SocialPlatform,
+} from "@/lib/social";
 import { withCommonDefaults, dim, toDimension, toSides, toCorners, FONT_OPTIONS, FONT_WEIGHT_OPTIONS, TEXT_TRANSFORM_OPTIONS, TEXT_DECORATION_OPTIONS, FONT_STYLE_OPTIONS, TEXT_ALIGN_OPTIONS, TEXT_VERTICAL_ALIGN_OPTIONS } from "@/lib/types";
 import type {
   Block,
@@ -15,6 +20,7 @@ import type {
   DividerBlock,
   SpacerBlock,
   StackBlock,
+  SocialBlock,
 } from "@/lib/types";
 import {
   Section,
@@ -697,6 +703,89 @@ function StackProperties({ block }: { block: StackBlock }) {
   );
 }
 
+function SocialProperties({ block }: { block: SocialBlock }) {
+  const updateBlock = useEditorStore((s) => s.updateBlock);
+  const padding = toSides(block.style.padding);
+  const width = toDimension(block.style.width, dim(32));
+  const height = toDimension(block.style.height, dim(32));
+
+  function changePlatform(platform: SocialPlatform) {
+    // Swap the link to the new platform's default when the user hasn't set a
+    // custom one (still on the previous platform's default, or empty).
+    const prevDefault = SOCIAL_PLATFORMS[block.content.platform]?.defaultHref;
+    const href =
+      !block.content.href || block.content.href === prevDefault
+        ? SOCIAL_PLATFORMS[platform].defaultHref
+        : block.content.href;
+    updateBlock(block.id, { content: { platform, href } });
+  }
+
+  return (
+    <>
+      <Section title="Content">
+        <Row label="Platform">
+          <select
+            value={block.content.platform}
+            onChange={(e) => changePlatform(e.target.value as SocialPlatform)}
+            className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs"
+          >
+            {SOCIAL_PLATFORM_LIST.map((p) => (
+              <option key={p} value={p}>
+                {SOCIAL_PLATFORMS[p].label}
+              </option>
+            ))}
+          </select>
+        </Row>
+        <Row label="Link">
+          <Input
+            value={block.content.href}
+            onChange={(e) =>
+              updateBlock(block.id, { content: { ...block.content, href: e.target.value } })
+            }
+            placeholder="https://..."
+            className="h-7 text-xs"
+          />
+        </Row>
+      </Section>
+      <Section title="Style">
+        <Row label="Color">
+          <ColorField
+            value={block.style.iconColor}
+            onChange={(iconColor) =>
+              updateBlock(block.id, { style: { ...block.style, iconColor } })
+            }
+          />
+        </Row>
+        <Row label="Align">
+          <AlignSelect
+            value={block.style.align}
+            onChange={(align) => updateBlock(block.id, { style: { ...block.style, align } })}
+          />
+        </Row>
+      </Section>
+      <Section title="Size">
+        <BlockSizeSection
+          block={block}
+          width={width}
+          height={height}
+          onSizeChange={(w, h) =>
+            updateBlock(block.id, { style: { ...block.style, width: w, height: h } })
+          }
+        />
+      </Section>
+      <Section title="Layout">
+        <Row label="Padding" align="start">
+          <SidesInput
+            value={padding}
+            onChange={(p) => updateBlock(block.id, { style: { ...block.style, padding: p } })}
+          />
+        </Row>
+      </Section>
+      <CommonStyleSections block={block} />
+    </>
+  );
+}
+
 export function PropertiesPanel({
   block,
   templateId = "",
@@ -732,6 +821,7 @@ export function PropertiesPanel({
       {block.type === "divider" && <DividerProperties block={block} />}
       {block.type === "spacer" && <SpacerProperties block={block} />}
       {block.type === "stack" && <StackProperties block={block} />}
+      {block.type === "social" && <SocialProperties block={block} />}
     </div>
   );
 }

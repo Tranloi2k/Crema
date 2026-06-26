@@ -32,6 +32,8 @@ export async function GET(
     content: normalizeRoot(JSON.parse(row.content)),
     updatedAt: row.updatedAt,
     locked: row.locked ?? false,
+    isPublic: row.isPublic ?? false,
+    publicSlug: row.publicSlug ?? null,
   });
 }
 

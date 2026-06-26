@@ -1,5 +1,6 @@
 import type { Block, CommonStyle, FlexAlign, FlexJustify, StackBlock } from "@/lib/types";
 import { toDimension, dim, dimToCss, toSides, sidesToCss } from "@/lib/types";
+import { socialIconUrl, SOCIAL_PLATFORMS } from "@/lib/social";
 import { isDistributedJustify } from "@/lib/layout/flexAlign";
 import { childFillsStackCrossAxis, childFillsStackMainAxis, isFillHeight, rowShouldStackOnMobile, stackHasFillMainChild } from "@/lib/layout/dimensions";
 import { commonStyleToCssString, commonContainerTableCss } from "@/lib/export/commonStyle";
@@ -347,6 +348,23 @@ function renderBlockCell(block: Block, ctx: RenderContext = {}): string {
           <tr><td style="border-top:${block.style.thickness}px solid ${block.style.color};font-size:0;line-height:0;">&nbsp;</td></tr>
         </table>
       </td>`;
+    case "social": {
+      const width = toDimension(block.style.width, dim(32));
+      const height = toDimension(block.style.height, dim(32));
+      const { widthAttr, heightAttr, style: imgStyle } = imageToHtmlAttrs(width, height);
+      const size = Math.round(
+        Math.max(width.unit === "px" ? width.value : 0, height.unit === "px" ? height.value : 0) * 2
+      );
+      const url = socialIconUrl(block.content.platform, block.style.iconColor, size || 64);
+      const label = SOCIAL_PLATFORMS[block.content.platform]?.label ?? block.content.platform;
+      const href = block.content.href ? escapeHtml(block.content.href) : "#";
+      const rowCellWidth = imageRowCellWidthCss(width, !!ctx.inRowStack);
+      const rowCellWidthAttr = imageRowCellWidthAttr(width, !!ctx.inRowStack);
+      const img = `<img src="${escapeHtml(url)}" alt="${escapeHtml(
+        label
+      )}"${widthAttr}${heightAttr} style="${imgStyle}" />`;
+      return `<td${rowCellWidthAttr} style="padding:${pad(block.style)};${rowCellWidth}text-align:${block.style.align};${commonSuffix(block.style)}"><a href="${href}" target="_blank">${img}</a></td>`;
+    }
     case "spacer": {
       const height = toDimension(block.style.height, dim(24));
       return `<td style="height:${dimToCss(height)};line-height:${dimToCss(height)};font-size:0;${commonSuffix(block.style)}">&nbsp;</td>`;
