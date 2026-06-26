@@ -1,12 +1,29 @@
 "use client";
 
+import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { Type, ImageIcon, RectangleHorizontal, Minus, MoveVertical, Rows3 } from "lucide-react";
+import {
+  Type,
+  ImageIcon,
+  RectangleHorizontal,
+  Minus,
+  MoveVertical,
+  Rows3,
+  Eye,
+  Send,
+} from "lucide-react";
 import type { BlockType } from "@/lib/types";
 import { useEditorStore } from "@/lib/store/editorStore";
+import { blocksToHtml } from "@/lib/export/toHtml";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-const PALETTE_ITEMS: { type: BlockType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+const PALETTE_ITEMS: {
+  type: BlockType;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
   { type: "text", label: "Text", icon: Type },
   { type: "image", label: "Image", icon: ImageIcon },
   { type: "button", label: "Button", icon: RectangleHorizontal },
@@ -16,7 +33,7 @@ const PALETTE_ITEMS: { type: BlockType; label: string; icon: React.ComponentType
 ];
 
 const PALETTE_META = Object.fromEntries(
-  PALETTE_ITEMS.map((item) => [item.type, item])
+  PALETTE_ITEMS.map((item) => [item.type, item]),
 ) as Record<BlockType, (typeof PALETTE_ITEMS)[number]>;
 
 /** Floating chip rendered inside the DndContext DragOverlay while a palette
@@ -64,7 +81,7 @@ function PaletteItem({
         orientation === "grid"
           ? "flex-col justify-center gap-1.5 rounded-xl p-3"
           : "shrink-0 gap-1.5 rounded-lg px-3 py-1.5",
-        isDragging && "opacity-50"
+        isDragging && "opacity-50",
       )}
     >
       <Icon className={orientation === "grid" ? "h-5 w-5" : "h-4 w-4"} />
@@ -83,13 +100,66 @@ export function BlockPalette() {
   );
 }
 
-/** Horizontal block palette — sits as a bar above the canvas. */
-export function BlockPaletteBar() {
+/** Horizontal block palette — full-width bar above the editor columns. */
+export function BlockPaletteBar({
+  onPreview,
+  readOnly = false,
+}: {
+  onPreview: () => void;
+  readOnly?: boolean;
+}) {
+  const name = useEditorStore((s) => s.name);
+  const root = useEditorStore((s) => s.root);
+  const [sending, setSending] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+
+  async function handleSendTest() {
+    if (!testEmail) return;
+    setSending(true);
+    try {
+      await fetch("/api/send-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: testEmail, html: blocksToHtml(root), subject: name }),
+      });
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
-    <div className="flex items-center gap-2 overflow-x-auto border-b border-border bg-muted/40 px-4 py-2">
-      {PALETTE_ITEMS.map((item) => (
-        <PaletteItem key={item.type} orientation="bar" {...item} />
-      ))}
+    <div className="flex items-center justify-between gap-4 overflow-x-auto border-b border-border/60 bg-background px-4 py-2">
+      {!readOnly && (
+        <div className="flex items-center gap-2">
+          {PALETTE_ITEMS.map((item) => (
+            <PaletteItem key={item.type} orientation="bar" {...item} />
+          ))}
+        </div>
+      )}
+      <div className={cn("flex shrink-0 items-center gap-2", readOnly && "ml-auto")}>
+        {!readOnly && (
+          <>
+            <Input
+              placeholder="test@email.com"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              className="h-8 w-44 rounded-full"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={handleSendTest}
+              disabled={sending}
+            >
+              <Send className="mr-1.5 h-4 w-4" /> Send test
+            </Button>
+          </>
+        )}
+        <Button variant="outline" size="sm" className="rounded-full" onClick={onPreview}>
+          <Eye className="mr-1.5 h-4 w-4" /> Preview
+        </Button>
+      </div>
     </div>
   );
 }

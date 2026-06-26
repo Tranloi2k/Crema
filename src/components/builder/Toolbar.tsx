@@ -1,20 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Eye, Redo2, Send, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/lib/store/editorStore";
 import { blocksToHtml } from "@/lib/export/toHtml";
 
-export function Toolbar({
-  onPreview,
-  readOnly = false,
-}: {
-  onPreview: () => void;
-  readOnly?: boolean;
-}) {
+export function Toolbar({ readOnly = false }: { readOnly?: boolean }) {
   const name = useEditorStore((s) => s.name);
   const setName = useEditorStore((s) => s.setName);
   const dirty = useEditorStore((s) => s.dirty);
@@ -23,8 +16,6 @@ export function Toolbar({
   const redo = useEditorStore((s) => s.redo);
   const canUndo = useEditorStore((s) => s.past.length > 0);
   const canRedo = useEditorStore((s) => s.future.length > 0);
-  const [sending, setSending] = useState(false);
-  const [testEmail, setTestEmail] = useState("");
 
   function handleExport() {
     const html = blocksToHtml(root);
@@ -35,20 +26,6 @@ export function Toolbar({
     a.download = `${name || "template"}.html`;
     a.click();
     URL.revokeObjectURL(url);
-  }
-
-  async function handleSendTest() {
-    if (!testEmail) return;
-    setSending(true);
-    try {
-      await fetch("/api/send-test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: testEmail, html: blocksToHtml(root), subject: name }),
-      });
-    } finally {
-      setSending(false);
-    }
   }
 
   return (
@@ -97,20 +74,8 @@ export function Toolbar({
             >
               <Redo2 className="h-4 w-4" />
             </Button>
-            <Input
-              placeholder="test@email.com"
-              value={testEmail}
-              onChange={(e) => setTestEmail(e.target.value)}
-              className="h-8 w-44 rounded-full"
-            />
-            <Button variant="outline" size="sm" className="rounded-full" onClick={handleSendTest} disabled={sending}>
-              <Send className="mr-1.5 h-4 w-4" /> Send test
-            </Button>
           </>
         )}
-        <Button variant="outline" size="sm" className="rounded-full" onClick={onPreview}>
-          <Eye className="mr-1.5 h-4 w-4" /> Preview
-        </Button>
         <Button size="sm" className="rounded-full" onClick={handleExport}>
           <Download className="mr-1.5 h-4 w-4" /> Export HTML
         </Button>

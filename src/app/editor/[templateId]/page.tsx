@@ -149,7 +149,8 @@ export default function EditorPage() {
           This template is locked on your current plan. You can preview and export only.
         </div>
       )}
-      <Toolbar onPreview={() => setPreviewOpen(true)} readOnly={readOnly} />
+      <Toolbar readOnly={readOnly} />
+      <BlockPaletteBar onPreview={() => setPreviewOpen(true)} readOnly={readOnly} />
       <div className="flex flex-1 overflow-hidden">
         {!readOnly && (
           <aside className="flex w-64 flex-col overflow-hidden border-r bg-muted/30">
@@ -157,7 +158,6 @@ export default function EditorPage() {
           </aside>
         )}
         <main className="relative flex flex-1 flex-col overflow-hidden bg-muted/60">
-          {!readOnly && <BlockPaletteBar />}
           <div className="relative flex-1 overflow-hidden">
             <Canvas root={root} zoom={zoom} tool={tool} />
             <ZoomToolbar tool={tool} onToolChange={setTool} zoom={zoom} onZoomChange={setZoom} />
