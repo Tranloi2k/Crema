@@ -3,11 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { SessionProvider } from "@/components/providers/SessionProvider";
-import {
-  buildPageMetadata,
-  SITE_NAME,
-  SITE_TAGLINE,
-} from "@/lib/seo";
+import { buildPageMetadata, SITE_NAME, SITE_TAGLINE } from "@/lib/seo";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -23,7 +19,7 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   ...buildPageMetadata(),
   title: {
-    default: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    default: `${SITE_NAME}: ${SITE_TAGLINE}`,
     template: `%s | ${SITE_NAME}`,
   },
 };

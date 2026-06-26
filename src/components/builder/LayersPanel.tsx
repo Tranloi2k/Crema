@@ -71,7 +71,15 @@ function LayerRow({
   const extendSelectionTo = useEditorStore((s) => s.extendSelectionTo);
   const [expanded, setExpanded] = useState(true);
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: block.id,
     data: { containerId },
     disabled: !canDrag,
@@ -146,6 +154,7 @@ function LayerRow({
             <span className="w-3 shrink-0" />
           )}
           <div
+            ref={canDrag ? setActivatorNodeRef : undefined}
             className={cn(
               "flex min-w-0 flex-1 items-center gap-1.5",
               canDrag && "cursor-grab active:cursor-grabbing"

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   closestCorners,
   pointerWithin,
@@ -11,6 +12,7 @@ import {
   useSensors,
   type CollisionDetection,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import { Lock } from "lucide-react";
 
@@ -19,6 +21,7 @@ import { normalizeRoot } from "@/lib/defaultBlocks";
 import { useAutosave } from "@/lib/hooks/useAutosave";
 import { useEditorShortcuts } from "@/lib/hooks/useEditorShortcuts";
 import { LeftPanel } from "@/components/builder/LeftPanel";
+import { BlockPaletteBar, PaletteDragGhost } from "@/components/builder/BlockPalette";
 import { Canvas } from "@/components/builder/Canvas";
 import { PropertiesPanel } from "@/components/builder/PropertiesPanel";
 import { Toolbar } from "@/components/builder/Toolbar";
@@ -32,6 +35,10 @@ import type { Block, BlockType, StackBlock } from "@/lib/types";
 const collisionDetection: CollisionDetection = (args) => {
   const pointerHits = pointerWithin(args);
   if (pointerHits.length > 0) return pointerHits;
+  // Blocks dragged out of the palette must land *inside* a droppable (a stack
+  // scope). If the pointer is outside every droppable, return no collision so
+  // the drop is cancelled instead of snapping to the nearest container.
+  if (args.active?.data.current?.source === "palette") return [];
   return closestCorners(args);
 };
 
@@ -54,6 +61,7 @@ export default function EditorPage() {
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [paletteDragType, setPaletteDragType] = useState<BlockType | null>(null);
   const [locked, setLocked] = useState(false);
   const [canUpload, setCanUpload] = useState(false);
   const [tool, setTool] = useState<Tool>("select");
@@ -92,7 +100,15 @@ export default function EditorPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
+  function handleDragStart(event: DragStartEvent) {
+    const data = event.active.data.current as
+      | { source?: string; blockType?: BlockType }
+      | undefined;
+    setPaletteDragType(data?.source === "palette" && data.blockType ? data.blockType : null);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    setPaletteDragType(null);
     if (readOnly) return;
 
     const { active } = event;
@@ -140,9 +156,12 @@ export default function EditorPage() {
             <LeftPanel />
           </aside>
         )}
-        <main className="relative flex-1 overflow-hidden bg-muted/60">
-          <Canvas root={root} zoom={zoom} tool={tool} />
-          <ZoomToolbar tool={tool} onToolChange={setTool} zoom={zoom} onZoomChange={setZoom} />
+        <main className="relative flex flex-1 flex-col overflow-hidden bg-muted/60">
+          {!readOnly && <BlockPaletteBar />}
+          <div className="relative flex-1 overflow-hidden">
+            <Canvas root={root} zoom={zoom} tool={tool} />
+            <ZoomToolbar tool={tool} onToolChange={setTool} zoom={zoom} onZoomChange={setZoom} />
+          </div>
         </main>
         {!readOnly ? (
           <aside className="w-72 overflow-y-auto border-l bg-muted/30">
@@ -166,8 +185,17 @@ export default function EditorPage() {
       {readOnly ? (
         editorBody
       ) : (
-        <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={collisionDetection}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setPaletteDragType(null)}
+        >
           {editorBody}
+          <DragOverlay dropAnimation={null}>
+            {paletteDragType ? <PaletteDragGhost type={paletteDragType} /> : null}
+          </DragOverlay>
         </DndContext>
       )}
       <PreviewModal root={root} open={previewOpen} onOpenChange={setPreviewOpen} />
