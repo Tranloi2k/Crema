@@ -134,12 +134,21 @@ export function TemplateList() {
               content={t.content}
               updatedAt={t.updatedAt}
               locked={t.locked}
+              duplicateDisabled={atLimit || usage?.downgradeSelectionPending}
               onDeleted={(id) => {
                 setTemplates((prev) => prev.filter((tpl) => tpl.id !== id));
                 setUsage((prev) =>
                   prev ? { ...prev, templateCount: Math.max(0, prev.templateCount - 1) } : prev
                 );
               }}
+              onDuplicated={(template) => {
+                setTemplates((prev) => [template as TemplateSummary, ...prev]);
+                setUsage((prev) =>
+                  prev ? { ...prev, templateCount: prev.templateCount + 1 } : prev
+                );
+                setError(null);
+              }}
+              onError={setError}
             />
           ))}
         </div>
