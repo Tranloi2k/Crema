@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Minus, Link2, Unlink2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Plus, Minus, Link2, Unlink2, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Dimension, FlexAlign, FlexJustify, Sides, Corners, Unit } from "@/lib/types";
@@ -309,21 +309,168 @@ export function ColorField({
   );
 }
 
+type UnitOption = { label: string; shortLabel?: string; value: Unit };
+
+function SizeModeSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: Unit;
+  options: UnitOption[];
+  onChange: (unit: Unit) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find((o) => o.value === value);
+  const closedLabel = selected?.shortLabel ?? selected?.label ?? "";
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative w-full min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className={cn(
+          "flex h-7 w-full items-center justify-between gap-1 rounded-md border border-input bg-background px-2 text-xs font-medium shadow-sm",
+          "transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          open && "border-primary ring-1 ring-ring"
+        )}
+      >
+        <span className="truncate">{closedLabel}</span>
+        <ChevronDown
+          className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="absolute right-0 top-[calc(100%+2px)] z-50 min-w-full overflow-hidden rounded-md border bg-popover p-1 shadow-md"
+        >
+          {options.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="option"
+              aria-selected={o.value === value}
+              onClick={() => {
+                onChange(o.value);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted",
+                o.value === value && "bg-muted font-medium"
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SizeValueField({
+  value,
+  unitSuffix,
+  onChange,
+}: {
+  value: number;
+  unitSuffix: string | null;
+  onChange: (next: number) => void;
+}) {
+  function handleValueChange(raw: string) {
+    if (raw === "") {
+      onChange(0);
+      return;
+    }
+    const next = Number(raw.replace(/[^\d.-]/g, ""));
+    if (!Number.isFinite(next)) return;
+    onChange(next);
+  }
+
+  function step(delta: number) {
+    onChange(Math.max(0, value + delta));
+  }
+
+  return (
+    <div className="flex h-7 min-w-0 items-stretch overflow-hidden rounded-md border border-input bg-background shadow-sm focus-within:ring-1 focus-within:ring-ring">
+      <div className="flex min-w-0 flex-1 items-center gap-0.5 pl-2 pr-1">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => handleValueChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              step(e.shiftKey ? 10 : 1);
+            }
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              step(e.shiftKey ? -10 : -1);
+            }
+          }}
+          className="min-w-[1.25rem] flex-1 bg-transparent text-xs tabular-nums outline-none"
+        />
+        {unitSuffix && (
+          <span className="shrink-0 text-xs text-muted-foreground">{unitSuffix}</span>
+        )}
+      </div>
+      <div className="flex w-5 shrink-0 flex-col border-l border-input">
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => step(1)}
+          className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Increase"
+        >
+          <ChevronUp className="h-3 w-3" />
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => step(-1)}
+          className="flex flex-1 items-center justify-center border-t border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Decrease"
+        >
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function UnitInput({
   value,
   onChange,
   unitOptions = UNIT_OPTIONS,
   parentSizePx,
   measuredPx,
+  variant = "default",
 }: {
   value: Dimension;
   onChange: (d: Dimension) => void;
-  unitOptions?: { label: string; value: Unit }[];
+  unitOptions?: UnitOption[];
   parentSizePx?: number;
   /** Live rendered size (px) used so Fit content → Fixed keeps the real size. */
   measuredPx?: number;
+  /** `size` = Framer-style value field + compact mode selector. */
+  variant?: "default" | "size";
 }) {
   const numericDisabled = value.unit === "fit-content" || value.unit === "fill";
+  const unitSuffix = !numericDisabled ? (value.unit === "px" ? "px" : value.unit === "%" ? "%" : null) : null;
 
   function handleUnitChange(nextUnit: Unit) {
     if (nextUnit === value.unit) return;
@@ -340,7 +487,7 @@ export function UnitInput({
       onChange({ ...value, value: 0 });
       return;
     }
-    const next = Number(raw);
+    const next = Number(raw.replace(/[^\d.-]/g, ""));
     if (!Number.isFinite(next)) return;
     if (numericDisabled) {
       onChange(dim(next, "px"));
@@ -349,26 +496,66 @@ export function UnitInput({
     onChange({ ...value, value: next });
   }
 
+  if (variant === "size") {
+    return (
+      <div className="grid w-full min-w-0 grid-cols-[minmax(0,1.4fr)_minmax(4.25rem,0.85fr)] items-center gap-1.5">
+        {numericDisabled ? (
+          <div className="flex h-7 items-center rounded-md border border-input bg-background px-2 text-xs text-muted-foreground shadow-sm">
+            Auto
+          </div>
+        ) : (
+          <SizeValueField
+            value={value.value}
+            unitSuffix={unitSuffix}
+            onChange={(next) => onChange({ ...value, value: next })}
+          />
+        )}
+        <SizeModeSelect value={value.unit} options={unitOptions} onChange={handleUnitChange} />
+      </div>
+    );
+  }
+
+  const modeSelect = (
+    <select
+      value={value.unit}
+      onChange={(e) => handleUnitChange(e.target.value as Unit)}
+      title={unitOptions.find((u) => u.value === value.unit)?.label}
+      className="h-7 w-full shrink-0 rounded-md border border-input bg-background px-1.5 text-xs font-medium"
+    >
+      {unitOptions.map((u) => (
+        <option key={u.value} value={u.value}>
+          {u.label}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
-    <div className="flex w-full gap-1">
-      <Input
-        type="number"
-        value={numericDisabled ? "" : value.value}
-        placeholder={numericDisabled ? "Auto" : undefined}
-        onChange={(e) => handleValueChange(e.target.value)}
-        className="h-7 flex-1 text-xs"
-      />
-      <select
-        value={value.unit}
-        onChange={(e) => handleUnitChange(e.target.value as Unit)}
-        className="h-7 w-24 rounded-md border border-input bg-background px-1.5 text-xs font-medium"
+    <div className="grid w-full grid-cols-[minmax(5.5rem,1fr)_5.75rem] gap-1">
+      <div
+        className={cn(
+          "flex h-7 min-w-0 items-center rounded-md border border-input bg-transparent shadow-sm",
+          "focus-within:outline-none focus-within:ring-1 focus-within:ring-ring"
+        )}
       >
-        {unitOptions.map((u) => (
-          <option key={u.value} value={u.value}>
-            {u.label}
-          </option>
-        ))}
-      </select>
+        {numericDisabled ? (
+          <span className="px-2 text-xs text-muted-foreground">Auto</span>
+        ) : (
+          <>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={value.value}
+              onChange={(e) => handleValueChange(e.target.value)}
+              className="h-full min-w-0 flex-1 bg-transparent px-2 text-xs tabular-nums outline-none"
+            />
+            {unitSuffix && (
+              <span className="shrink-0 pr-2 text-xs text-muted-foreground">{unitSuffix}</span>
+            )}
+          </>
+        )}
+      </div>
+      {modeSelect}
     </div>
   );
 }
@@ -392,6 +579,7 @@ export function HeightUnitInput({
       unitOptions={SIZE_UNIT_OPTIONS}
       parentSizePx={parentPx}
       measuredPx={measureBlockSizePx(blockId, zoom)?.height}
+      variant="size"
     />
   );
 }
@@ -415,6 +603,7 @@ export function WidthUnitInput({
       unitOptions={SIZE_UNIT_OPTIONS}
       parentSizePx={parentPx}
       measuredPx={measureBlockSizePx(blockId, zoom)?.width}
+      variant="size"
     />
   );
 }

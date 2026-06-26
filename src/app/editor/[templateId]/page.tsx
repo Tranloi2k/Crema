@@ -164,7 +164,7 @@ export default function EditorPage() {
           </div>
         </main>
         {!readOnly ? (
-          <aside className="w-72 overflow-y-auto border-l bg-muted/30">
+          <aside className="w-80 overflow-y-auto border-l bg-muted/30">
             <PropertiesPanel
               block={selectedBlock}
               templateId={templateId}
@@ -172,7 +172,7 @@ export default function EditorPage() {
             />
           </aside>
         ) : (
-          <aside className="flex w-72 items-center justify-center border-l bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+          <aside className="flex w-80 items-center justify-center border-l bg-muted/30 p-6 text-center text-sm text-muted-foreground">
             Properties are disabled while this template is locked.
           </aside>
         )}

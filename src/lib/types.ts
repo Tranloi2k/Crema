@@ -28,11 +28,11 @@ export const UNIT_OPTIONS: { label: string; value: Unit }[] = [
 ];
 
 /** Framer-style labels for height (and width) size fields. */
-export const SIZE_UNIT_OPTIONS: { label: string; value: Unit }[] = [
+export const SIZE_UNIT_OPTIONS: { label: string; shortLabel?: string; value: Unit }[] = [
   { label: "Fixed", value: "px" },
-  { label: "Relative", value: "%" },
+  { label: "Relative", shortLabel: "Rel", value: "%" },
   { label: "Fill", value: "fill" },
-  { label: "Fit content", value: "fit-content" },
+  { label: "Fit", value: "fit-content" },
 ];
 
 export interface Dimension {
