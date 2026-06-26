@@ -9,6 +9,7 @@ export function SpacerBlock({ block }: { block: SpacerBlockType }) {
     <div
       style={{ height: dimToCss(height), ...commonStyleToReactStyle(block.style) }}
       className="flex items-center justify-center text-[10px] text-muted-foreground/50"
+      data-resize-target={block.id}
     >
       spacer
     </div>

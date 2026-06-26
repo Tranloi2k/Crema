@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { hashPassword, normalizeEmail, validatePassword } from "@/lib/auth/password";
+import { sendWelcomeEmail } from "@/lib/emails/sendWelcomeEmail";
+import { seedWelcomeTemplate } from "@/lib/emails/seedWelcomeTemplate";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 
@@ -59,6 +61,14 @@ export async function POST(req: Request) {
       name: users.name,
       email: users.email,
     });
+
+  try {
+    await seedWelcomeTemplate(created.id);
+  } catch {
+    // Signup should succeed even if template seed fails.
+  }
+
+  void sendWelcomeEmail({ to: created.email!, name: created.name ?? name }).catch(() => {});
 
   return NextResponse.json(
     { id: created.id, name: created.name, email: created.email },

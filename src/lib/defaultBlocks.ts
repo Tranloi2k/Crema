@@ -22,6 +22,8 @@ export function createBlock(type: BlockType): Block {
           align: "left",
           color: "#1a1a1a",
           fontSize: 16,
+          lineHeight: 1.5,
+          letterSpacing: 0,
           fontFamily: DEFAULT_FONT_FAMILY,
           fontWeight: 400,
           textTransform: "none",
@@ -57,6 +59,8 @@ export function createBlock(type: BlockType): Block {
           bgColor: "#111827",
           textColor: "#ffffff",
           borderRadius: 6,
+          width: dim(0, "fit-content"),
+          height: dim(0, "fit-content"),
           padding: 12,
         },
       };

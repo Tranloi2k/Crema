@@ -7,6 +7,7 @@ import { toDimension, dim, dimToCss, toSides, sidesToCss } from "@/lib/types";
 import { flexAlignToCss, flexJustifyToCss, isDistributedJustify } from "@/lib/layout/flexAlign";
 import {
   blockUsesFlexHeight,
+  blockShrinksToContentWidth,
   childFillsStackCrossAxis,
   childFillsStackMainAxis,
   getBlockHeightDim,
@@ -38,7 +39,8 @@ export function StackChildren({ block }: { block: StackBlockType }) {
   const columnHeightLayout = stackNeedsColumnHeightLayout(block, isRow);
   const rowHeightLayout = stackNeedsRowHeightLayout(block, isRow);
   const rowWidthLayout = stackNeedsRowWidthLayout(block, isRow);
-  const fitHeight = stackHasFitHeight(block);
+  const rowCrossFill = isRow && block.children.some((c) => childFillsStackCrossAxis(c, true));
+  const fitHeight = stackHasFitHeight(block) && !rowCrossFill;
   const isEmpty = block.children.length === 0;
 
   return (
@@ -51,7 +53,8 @@ export function StackChildren({ block }: { block: StackBlockType }) {
         justifyContent: flexJustifyToCss(block.style.justify),
         alignItems: flexAlignToCss(block.style.align),
         width: isFillWidth || rowWidthLayout ? (width.unit === "fit-content" ? "100%" : dimToCss(width)) : undefined,
-        maxWidth: isFillWidth || rowWidthLayout ? "100%" : undefined,
+        maxWidth: "100%",
+        minWidth: 0,
         ...(fitHeight ? { height: "auto", alignSelf: "flex-start" } : {}),
         ...(columnHeightLayout
           ? {
@@ -72,7 +75,7 @@ export function StackChildren({ block }: { block: StackBlockType }) {
           : {}),
       }}
       className={cn(
-        "w-full rounded border border-dashed border-muted-foreground/30",
+        "w-full min-w-0 rounded border border-dashed border-muted-foreground/30",
         isEmpty && "min-h-[48px]",
         !fitHeight && "self-stretch",
         (columnHeightLayout || rowHeightLayout) && "flex-1",
@@ -101,8 +104,16 @@ export function StackChildren({ block }: { block: StackBlockType }) {
                 block={child}
                 containerId={block.id}
                 index={index}
-                stretchWidth={childFillsStackCrossAxis(child, isRow)}
-                compactWidth={isRow && isDistributedJustify(block.style.justify)}
+                stretchWidth={
+                  isRow
+                    ? childFillsStackMainAxis(child, true, block.style.justify)
+                    : childFillsStackCrossAxis(child, false)
+                }
+                stretchHeight={isRow && childFillsStackCrossAxis(child, true)}
+                compactWidth={
+                  isRow &&
+                  (isDistributedJustify(block.style.justify) || blockShrinksToContentWidth(child))
+                }
               />
             </StackChildWrapper>
           ))
@@ -141,11 +152,13 @@ export function StackBlock({ block }: { block: StackBlockType }) {
               minHeight: 0,
             }
           : {}),
-        maxWidth: isFillWidth ? "100%" : undefined,
+        maxWidth: "100%",
+        minWidth: 0,
         alignSelf: isFillWidth || isFillH ? "stretch" : undefined,
         ...commonStyleToReactStyle(block.style),
       }}
-      className={cn((isFillWidth || isFillH) && "w-full", needsFrame && "min-h-0")}
+      className={cn((isFillWidth || isFillH) && "w-full min-w-0", needsFrame && "min-h-0")}
+      data-resize-target={block.id}
     >
       <StackChildren block={block} />
     </div>
@@ -177,12 +190,11 @@ function StackChildWrapper({
         className={cn(
           fillMain ? "min-w-0 flex-1" : "shrink-0",
           flexHeight && "flex min-h-0 flex-col",
-          flexHeight && !fillCross && "h-auto"
+          fillCross && "self-stretch"
         )}
         style={{
           alignSelf: fillCross ? "stretch" : alignSelf,
           width: fillMain ? undefined : "auto",
-          height: fillCross ? "100%" : "auto",
         }}
       >
         {children}
@@ -192,7 +204,11 @@ function StackChildWrapper({
 
   return (
     <div
-      className={cn(fillCross ? "w-full" : "max-w-full", flexHeight && "flex min-h-0 flex-col", fillMain && "flex-1")}
+      className={cn(
+        fillCross ? "w-full min-w-0" : "max-w-full min-w-0",
+        flexHeight && "flex min-h-0 flex-col",
+        fillMain && "min-h-0 flex-1"
+      )}
       style={{
         alignSelf: fillCross ? "stretch" : alignSelf,
         width: fillCross ? "100%" : "auto",

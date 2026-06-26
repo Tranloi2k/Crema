@@ -11,6 +11,8 @@ import { db } from "@/lib/db/client";
 import { users, accounts, sessions, verificationTokens } from "@/lib/db/schema";
 import { normalizeEmail, verifyPassword } from "@/lib/auth/password";
 import { isDevBypassEnabled } from "@/lib/auth/devBypass";
+import { sendWelcomeEmail } from "@/lib/emails/sendWelcomeEmail";
+import { seedWelcomeTemplate } from "@/lib/emails/seedWelcomeTemplate";
 
 const hasGoogle = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
 const hasGithub = !!process.env.GITHUB_ID && !!process.env.GITHUB_SECRET;
@@ -156,4 +158,18 @@ export const authOptions: NextAuthOptions = {
     },
   },
   ...(isDevBypassEnabled() ? { allowDangerousEmailAccountLinking: true } : {}),
+  events: {
+    async createUser({ user }) {
+      if (!user.id || !user.email) return;
+      try {
+        await seedWelcomeTemplate(user.id);
+      } catch {
+        // OAuth signup should still complete if seeding fails.
+      }
+      void sendWelcomeEmail({
+        to: user.email,
+        name: user.name ?? "there",
+      }).catch(() => {});
+    },
+  },
 };

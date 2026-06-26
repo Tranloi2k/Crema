@@ -1,14 +1,32 @@
 import type { Block, CommonStyle, FlexAlign, FlexJustify, StackBlock } from "@/lib/types";
 import { toDimension, dim, dimToCss, toSides, sidesToCss } from "@/lib/types";
 import { isDistributedJustify } from "@/lib/layout/flexAlign";
+import { childFillsStackCrossAxis, childFillsStackMainAxis, isFillHeight, rowShouldStackOnMobile, stackHasFillMainChild } from "@/lib/layout/dimensions";
 import { commonStyleToCssString, commonContainerTableCss } from "@/lib/export/commonStyle";
-import { imageToHtmlAttrs } from "@/lib/export/imageStyle";
+import { imageToHtmlAttrs, imageRowCellWidthAttr, imageRowCellWidthCss } from "@/lib/export/imageStyle";
+import {
+  buttonAlignAttr,
+  buttonCellHeightAttr,
+  buttonCellHeightStyle,
+  buttonCellWidthStyle,
+  buttonLinkDisplayStyle,
+  buttonLinkHeightStyle,
+  buttonLinkPaddingStyle,
+  buttonTableAlignAttr,
+  buttonTablePresentationStyle,
+  buttonTableWidthAttr,
+  isButtonCollapsed,
+} from "@/lib/export/buttonStyle";
 import {
   textSizeToCss,
   textTypographyToCss,
   textVerticalAlignToCss,
   hasExportFixedTextHeight,
   normalizeTextTypography,
+  textExportInnerTableCss,
+  textExportInnerTableAttrs,
+  textExportInnerCellCss,
+  stackCrossAlignToVerticalCss,
 } from "@/lib/export/textStyle";
 
 function pad(style: { padding: number | import("@/lib/types").Sides | undefined }): string {
@@ -29,6 +47,7 @@ type RenderContext = {
   rowChildIndex?: number;
   rowChildCount?: number;
   parentHasHeight?: boolean;
+  stackAlign?: FlexAlign;
 };
 
 function escapeHtml(s: string) {
@@ -39,9 +58,33 @@ function escapeHtml(s: string) {
     .replace(/"/g, "&quot;");
 }
 
-function commonSuffix(style: Partial<CommonStyle>, clipRadius = true): string {
-  const css = commonStyleToCssString(style, { clipRadius });
+function commonSuffix(style: Partial<CommonStyle>, clipRadius = true, skipBackground = false): string {
+  const css = commonStyleToCssString(style, { clipRadius, skipBackground });
   return css ? `${css};` : "";
+}
+
+/** Stretch a table cell so fill-height children match canvas flex growth. */
+function withFillHeight(cellHtml: string, expand: boolean): string {
+  if (!expand) return cellHtml;
+  return cellHtml.replace(
+    "<td ",
+    '<td valign="top" height="100%" style="height:100%;vertical-align:top;" '
+  );
+}
+
+function stackHeightCss(stackH: ReturnType<typeof toDimension>): string {
+  return stackH.unit === "px" ? `height:${stackH.value}px;` : `height:${dimToCss(stackH)};`;
+}
+
+/** Match canvas flex: only stretch inner table rows when a child actually grows (fill) or justify distributes space. */
+function stackContentTableFullHeight(stack: StackBlock, sizedParent: boolean): boolean {
+  const stackH = toDimension(stack.style.height, dim(0, "fit-content"));
+  const stackSized =
+    stackH.unit === "px" || stackH.unit === "%" || (isFillHeight(stackH) && sizedParent);
+  if (!stackSized) return false;
+  const justify = stack.style.justify ?? "start";
+  if (isDistributedJustify(justify)) return true;
+  return stackHasFillMainChild(stack);
 }
 
 function flexAlignToValign(a: FlexAlign | undefined): "top" | "middle" | "bottom" {
@@ -68,8 +111,8 @@ function flexJustifyToHAlign(a: FlexJustify | undefined): "left" | "center" | "r
   return "left";
 }
 
-const ROW_FLEX_SPACER = `<td width="100%" style="width:100%;font-size:0;line-height:0;">&nbsp;</td>`;
-const ROW_EVENLY_SPACER = `<td width="1%" style="width:1%;font-size:0;line-height:0;">&nbsp;</td>`;
+const ROW_FLEX_SPACER = `<td class="crema-gap" width="100%" style="width:100%;font-size:0;line-height:0;">&nbsp;</td>`;
+const ROW_EVENLY_SPACER = `<td class="crema-gap" width="1%" style="width:1%;font-size:0;line-height:0;">&nbsp;</td>`;
 const COL_FLEX_SPACER = `<tr><td height="100%" style="height:100%;font-size:0;line-height:0;">&nbsp;</td></tr>`;
 
 function joinWithFlexSpacers(
@@ -94,7 +137,7 @@ function joinWithFlexSpacers(
 }
 
 function buildStackRows(block: StackBlock, parentHasHeight = false): string {
-  const gapCell = `<td style="width:${block.style.gap}px;font-size:0;line-height:0;">&nbsp;</td>`;
+  const gapCell = `<td class="crema-gap" style="width:${block.style.gap}px;font-size:0;line-height:0;">&nbsp;</td>`;
   const gapRow = `<tr><td style="height:${block.style.gap}px;font-size:0;line-height:0;">&nbsp;</td></tr>`;
   const isRow = block.style.direction === "row";
   const justify = block.style.justify ?? "start";
@@ -102,7 +145,8 @@ function buildStackRows(block: StackBlock, parentHasHeight = false): string {
   const halign = flexAlignToHAlign(block.style.align);
   const cellWrap = (cellHtml: string, childIndex?: number, childCount?: number) => {
     if (isRow) {
-      let attrs = `valign="${valign}"`;
+      // crema-col lets the media query stack horizontal columns on mobile.
+      let attrs = `class="crema-col" valign="${valign}"`;
       if (
         isDistributedJustify(justify) &&
         childIndex !== undefined &&
@@ -121,11 +165,15 @@ function buildStackRows(block: StackBlock, parentHasHeight = false): string {
   if (isRow) {
     const childCount = block.children.length;
     const stackH = toDimension(block.style.height, dim(0, "fit-content"));
-    const stackHasHeight = stackH.unit === "px" || stackH.unit === "%";
+    const stackHasHeight =
+      stackH.unit === "px" || stackH.unit === "%" || (isFillHeight(stackH) && parentHasHeight);
+    const rowCrossFill = block.children.some((c) => childFillsStackCrossAxis(c, true));
+    const innerRowHeight = stackHasHeight || rowCrossFill ? "height:100%;" : "";
     const rawCells = block.children.map((c, i) =>
       cellWrap(
         renderBlockCell(c, {
           inRowStack: true,
+          stackAlign: block.style.align,
           rowJustify: justify,
           rowChildIndex: i,
           rowChildCount: childCount,
@@ -138,30 +186,37 @@ function buildStackRows(block: StackBlock, parentHasHeight = false): string {
     const rowStyle = stackHasHeight
       ? `height:${stackH.unit === "px" ? `${stackH.value}px` : dimToCss(stackH)};`
       : "";
+    const mobileStackClass = rowShouldStackOnMobile(block) ? ' class="crema-stack-mobile"' : "";
 
     // Row stacks in email always span the parent cell width.
     if (isDistributedJustify(justify)) {
       const cells = joinWithFlexSpacers(rawCells, justify, ROW_FLEX_SPACER, ROW_EVENLY_SPACER);
-      const innerHeight = stackHasHeight ? "height:100%;" : "";
-      return `<tr><td style="width:100%;${rowStyle}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;${innerHeight}border-collapse:collapse;"><tr>${cells}</tr></table></td></tr>`;
+      return `<tr><td style="width:100%;${rowStyle}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${mobileStackClass} style="width:100%;${innerRowHeight}border-collapse:collapse;"><tr>${cells}</tr></table></td></tr>`;
     }
 
     const cells = rawCells.join(gapCell);
     if (justify !== "start") {
       const distribute = flexJustifyToHAlign(justify);
-      return `<tr><td align="${distribute}" style="width:100%;${rowStyle}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;"><tr>${cells}</tr></table></td></tr>`;
+      return `<tr><td align="${distribute}" style="width:100%;${rowStyle}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${mobileStackClass} style="width:100%;${innerRowHeight}border-collapse:collapse;"><tr>${cells}</tr></table></td></tr>`;
     }
     if (stackHasHeight) {
-      return `<tr style="${rowStyle}"><td valign="${valign}" style="${rowStyle}width:100%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;"><tr>${cells}</tr></table></td></tr>`;
+      return `<tr style="${rowStyle}"><td valign="${valign}" style="${rowStyle}width:100%;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${mobileStackClass} style="width:100%;${innerRowHeight}border-collapse:collapse;"><tr>${cells}</tr></table></td></tr>`;
     }
-    return `<tr><td style="width:100%;${rowStyle}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;"><tr>${cells}</tr></table></td></tr>`;
+    return `<tr><td style="width:100%;${rowStyle}"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"${mobileStackClass} style="width:100%;${innerRowHeight}border-collapse:collapse;"><tr>${cells}</tr></table></td></tr>`;
   }
 
   const stackH = toDimension(block.style.height, dim(0, "fit-content"));
   const stackHasHeight = stackH.unit === "px" || stackH.unit === "%";
-  const rawChildRows = block.children.map((c) =>
-    `<tr>${cellWrap(renderBlockCell(c, { parentHasHeight: stackHasHeight || parentHasHeight }))}</tr>`
-  );
+  const parentSized = stackHasHeight || parentHasHeight;
+  const rawChildRows = block.children.map((c) => {
+    const childCtx = { parentHasHeight: parentSized };
+    const fillMain = childFillsStackMainAxis(c, false, justify);
+    const cell = withFillHeight(
+      cellWrap(renderBlockCell(c, childCtx)),
+      fillMain && parentSized
+    );
+    return `<tr>${cell}</tr>`;
+  });
 
   if (isDistributedJustify(justify) && stackHasHeight) {
     const childRows = joinWithFlexSpacers(rawChildRows, justify, COL_FLEX_SPACER);
@@ -175,6 +230,15 @@ function buildStackRows(block: StackBlock, parentHasHeight = false): string {
   }
 
   const childRows = rawChildRows.join(gapRow);
+
+  if (stackHasHeight && justify === "start") {
+    const innerHeight = stackContentTableFullHeight(block, parentHasHeight) ? "height:100%;" : "";
+    return `<tr><td valign="top" style="${stackHeightCss(stackH)}vertical-align:top;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;${innerHeight}">
+        ${childRows}
+      </table>
+    </td></tr>`;
+  }
 
   if (justify !== "start" && stackHasHeight) {
     const distribute = flexJustifyToValign(justify);
@@ -206,12 +270,22 @@ function renderBlockCell(block: Block, ctx: RenderContext = {}): string {
           ? "white-space:nowrap;"
           : "";
       const fixedHeight = hasExportFixedTextHeight(block.style, ctx);
+      // In row stacks: fixed-height frames use inner verticalAlign; fit-content uses stack cross-axis align.
+      const outerValignCss = ctx.inRowStack
+        ? fixedHeight
+          ? ""
+          : stackCrossAlignToVerticalCss(ctx.stackAlign)
+        : textVerticalAlignToCss(block.style);
+      const outerHeightAttr = fixedHeight && ctx.inRowStack ? ' height="100%"' : "";
 
       if (fixedHeight) {
-        return `<td style="padding:${pad(block.style)};${edgeCell}${sizeSuffix}${nowrap}${textVerticalAlignToCss(block.style)}${commonSuffix(block.style, false)}">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+        const innerTableCss = textExportInnerTableCss(true);
+        const innerTableAttrs = textExportInnerTableAttrs(true);
+        const innerCellCss = textExportInnerCellCss(typography, valign, nowrap, true);
+        return `<td${outerHeightAttr} style="padding:${pad(block.style)};${edgeCell}${sizeSuffix}${nowrap}${outerValignCss}${commonSuffix(block.style, false)}">
+        <table role="presentation"${innerTableAttrs} cellpadding="0" cellspacing="0" border="0" style="${innerTableCss}">
           <tr>
-            <td style="${typography};${nowrap}vertical-align:${valign};">
+            <td style="${innerCellCss}">
               ${block.content.html}
             </td>
           </tr>
@@ -219,32 +293,54 @@ function renderBlockCell(block: Block, ctx: RenderContext = {}): string {
       </td>`;
       }
 
-      return `<td style="padding:${pad(block.style)};${edgeCell}${typography};${sizeSuffix}${nowrap}${commonSuffix(block.style, false)}">${block.content.html}</td>`;
+      return `<td style="padding:${pad(block.style)};${edgeCell}${typography};${sizeSuffix}${nowrap}${outerValignCss}${commonSuffix(block.style, false)}">${block.content.html}</td>`;
     }
     case "image": {
       const width = toDimension(block.style.width, dim(560));
       const height = toDimension(block.style.height, dim(0, "fit-content"));
       const { widthAttr, heightAttr, style: imgStyle } = imageToHtmlAttrs(width, height);
+      const rowCellWidth = imageRowCellWidthCss(width, !!ctx.inRowStack);
+      const rowCellWidthAttr = imageRowCellWidthAttr(width, !!ctx.inRowStack);
       const img = `<img src="${escapeHtml(block.content.src)}" alt="${escapeHtml(
         block.content.alt
       )}"${widthAttr}${heightAttr} style="${imgStyle}" />`;
       const inner = block.content.href
         ? `<a href="${escapeHtml(block.content.href)}" target="_blank">${img}</a>`
         : img;
-      return `<td style="padding:${pad(block.style)};text-align:${block.style.align};${commonSuffix(block.style)}">${inner}</td>`;
+      return `<td${rowCellWidthAttr} style="padding:${pad(block.style)};${rowCellWidth}text-align:${block.style.align};${commonSuffix(block.style)}">${inner}</td>`;
     }
-    case "button":
-      return `<td style="padding:${pad(block.style)};text-align:${block.style.align};${commonSuffix(block.style)}">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:${
-          block.style.align === "center" ? "0 auto" : "0"
-        };">
+    case "button": {
+      const width = toDimension(block.style.width, dim(0, "fit-content"));
+      const height = toDimension(block.style.height, dim(0, "fit-content"));
+
+      if (isButtonCollapsed(width, height)) {
+        return `<td style="padding:${pad(block.style)};font-size:0;line-height:0;${commonSuffix(block.style, true, true)}">&nbsp;</td>`;
+      }
+
+      const tableWidth = buttonTableWidthAttr(width);
+      const tableAlign = buttonTableAlignAttr(block.style.align, width);
+      const tableStyle = buttonTablePresentationStyle(block.style.align, width);
+      const cellWidth = buttonCellWidthStyle(width);
+      const cellHeightAttr = buttonCellHeightAttr(height);
+      const cellHeight = buttonCellHeightStyle(height);
+      const linkDisplay = buttonLinkDisplayStyle(width, height);
+      const linkHeight = buttonLinkHeightStyle(height);
+      const linkPadding = buttonLinkPaddingStyle(height, width);
+      const innerAlign = buttonAlignAttr(block.style.align);
+      const outerAlignStyle =
+        width.unit === "fit-content" ? `text-align:${block.style.align};` : "";
+      // The button color is rendered on the inner cell + <a>; keep it off the
+      // full-width outer cell so it doesn't bleed across the row.
+      return `<td style="padding:${pad(block.style)};${outerAlignStyle}${commonSuffix(block.style, true, true)}">
+        <table role="presentation"${tableWidth}${tableAlign} cellpadding="0" cellspacing="0" border="0" style="${tableStyle}">
           <tr>
-            <td bgcolor="${block.style.bgColor}" style="border-radius:${block.style.borderRadius}px;">
-              <a href="${escapeHtml(block.content.href)}" target="_blank" style="display:inline-block;padding:10px 20px;color:${block.style.textColor};font-family:Arial,Helvetica,sans-serif;font-size:14px;text-decoration:none;border-radius:${block.style.borderRadius}px;">${escapeHtml(block.content.label)}</a>
+            <td${innerAlign}${cellHeightAttr} bgcolor="${block.style.bgColor}" style="${cellWidth}${cellHeight}border-radius:${block.style.borderRadius}px;background-color:${block.style.bgColor};">
+              <a href="${escapeHtml(block.content.href)}" target="_blank" style="${linkDisplay}${linkHeight}padding:${linkPadding};background-color:${block.style.bgColor};color:${block.style.textColor};font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:normal;text-decoration:none;border-radius:${block.style.borderRadius}px;text-align:center;box-sizing:border-box;white-space:nowrap;">${escapeHtml(block.content.label)}</a>
             </td>
           </tr>
         </table>
       </td>`;
+    }
     case "divider":
       return `<td style="padding:${pad(block.style)};${commonSuffix(block.style)}">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -268,12 +364,23 @@ function renderBlockCell(block: Block, ctx: RenderContext = {}): string {
       const containerCss = commonContainerTableCss(block.style);
       const stackH = toDimension(block.style.height, dim(0, "fit-content"));
       const stackHasHeight = stackH.unit === "px" || stackH.unit === "%";
-      return `<td style="padding:0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${widthDecl}${containerCss};">
+      const nestedParentSized = stackHasHeight || !!ctx.parentHasHeight;
+      const fillMain = !isRow && isFillHeight(stackH) && nestedParentSized;
+      const contentTableHeight = stackContentTableFullHeight(block, nestedParentSized)
+        ? "height:100%;"
+        : "";
+      const outerTdStyle = fillMain
+        ? "padding:0;height:100%;vertical-align:top;"
+        : "padding:0;";
+      const outerTdAttrs = fillMain ? ' valign="top" height="100%"' : "";
+      const innerPadStyle = fillMain ? `padding:${stackPad};height:100%;vertical-align:top;` : `padding:${stackPad};`;
+      const innerPadAttrs = fillMain ? ' valign="top" height="100%"' : "";
+      return `<td${outerTdAttrs} style="${outerTdStyle}">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${widthDecl}${containerCss};${fillMain ? "height:100%;" : ""}">
           <tr>
-            <td style="padding:${stackPad};">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
-                ${buildStackRows(block, stackHasHeight)}
+            <td${innerPadAttrs} style="${innerPadStyle}">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;${contentTableHeight}">
+                ${buildStackRows(block, nestedParentSized)}
               </table>
             </td>
           </tr>
@@ -288,12 +395,12 @@ function renderEmailTable(root: StackBlock, canvasWidth: number): string {
   const containerCss = commonContainerTableCss(root.style);
   const rootH = toDimension(root.style.height, dim(0, "fit-content"));
   const frameHeightCss =
-    rootH.unit === "px" && rootH.value > 0 ? `min-height:${rootH.value}px;` : "";
+    rootH.unit === "px" && rootH.value > 0 ? stackHeightCss(rootH) : "";
 
   return `<table id="crema-email" role="presentation" width="${canvasWidth}" cellpadding="0" cellspacing="0" border="0" style="width:${canvasWidth}px;max-width:100%;box-sizing:border-box;background-color:#ffffff;${frameHeightCss}${containerCss};">
         <tr>
-          <td id="crema-email-content" style="padding:${rootPad};">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+          <td id="crema-email-content" valign="top" style="padding:${rootPad};vertical-align:top;${frameHeightCss}">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;${frameHeightCss}">
               ${buildStackRows(root)}
             </table>
           </td>
@@ -327,9 +434,20 @@ export function blocksToHtml(root: StackBlock, options?: BlocksToHtmlOptions): s
 <style>
   html, body { margin: 0; padding: 0; height: auto; line-height: 0; }
   table { border-collapse: collapse; }
+  td { vertical-align: top; }
   p { margin: 0; }
+  #crema-email-content p + p,
+  #crema-email-content ul,
+  #crema-email-content ol { margin-top: 0.5em; }
+  #crema-email-content strong { font-weight: 700; }
   img { border: 0; display: block; max-width: 100%; }
   #crema-email { box-sizing: border-box; line-height: normal; vertical-align: top; }
+  #crema-email-content { vertical-align: top; }
+  @media only screen and (max-width: 480px) {
+    /* Stack multi-column row layouts vertically on mobile — compact rows (logo + label) stay inline. */
+    .crema-stack-mobile td.crema-col { display: block !important; width: 100% !important; box-sizing: border-box; }
+    .crema-stack-mobile td.crema-gap { display: none !important; }
+  }
 </style>
 </head>
 <body style="margin:0;padding:0;line-height:0;background-color:${bodyBg};">

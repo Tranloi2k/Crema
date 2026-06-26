@@ -58,16 +58,93 @@
   }
 }
 
-/* Fixed-height text frames (Framer-style): frame clips; content aligns inside. */
+/* Fit-content height: collapse editor wrapper boxes so the frame hugs the text. */
+.text-block-surface[data-height-mode="fit"] {
+  height: fit-content;
+  min-height: 0;
+}
+
+.text-block-surface[data-height-mode="fit"] .tiptap {
+  display: block;
+  width: 100%;
+}
+
+/* TipTap adds a trailing <br> for cursor placement — hide it so it doesn't look like bottom padding. */
+.text-block-surface .tiptap p br.ProseMirror-trailingBreak {
+  display: none;
+  line-height: 0;
+}
+
+.text-block-surface .tiptap p:only-child br.ProseMirror-trailingBreak {
+  display: none;
+}
+
+/* Fixed-height text frames: editor fills the frame and clips like export (no scrollbars). */
+.text-block-editor-surface.text-block-editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.text-block-editor-surface,
 .text-block-editor {
   width: 100%;
-  max-height: 100%;
-  overflow: auto;
-  flex-shrink: 0;
+}
+
+/* Live typography from block style — applied directly to TipTap content */
+.text-block-surface .tiptap,
+.text-block-surface .tiptap p,
+.text-block-surface .tiptap li,
+.text-block-surface .tiptap h1,
+.text-block-surface .tiptap h2,
+.text-block-surface .tiptap h3 {
+  font-family: var(--crema-text-font-family, Arial, Helvetica, sans-serif);
+  font-size: var(--crema-text-font-size, 16px);
+  color: var(--crema-text-color, #1a1a1a);
+  font-weight: var(--crema-text-font-weight, 400);
+  text-align: var(--crema-text-align, left);
+  text-transform: var(--crema-text-transform, none);
+  text-decoration: var(--crema-text-decoration, none);
+  font-style: var(--crema-text-font-style, normal);
+  line-height: var(--crema-text-line-height, 1.5);
+  letter-spacing: var(--crema-text-letter-spacing, 0px);
+}
+
+.text-block-surface .tiptap {
+  padding: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.text-block-surface .tiptap p {
+  margin: 0;
+}
+
+.text-block-surface .tiptap > * + * {
+  margin-top: 0.5em;
+}
+
+.text-block-surface .tiptap strong {
+  font-weight: 700;
 }
 
 .text-block-editor .tiptap {
   outline: none;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* Top-aligned / cross-axis fill frames: stretch editor surface to the full frame height. */
+.text-block-surface[data-height-mode="fixed"][data-vertical-align="top"] .text-block-editor .tiptap,
+.text-block-surface[data-height-mode="fixed"][data-cross-axis-fill="true"] .text-block-editor .tiptap {
+  flex: 1;
+  min-height: 0;
 }
 
 .text-block-editor .tiptap p {

@@ -21,16 +21,36 @@ function resolveHeightToPx(h: Dimension, parentPx: number): number {
   }
 }
 
-/** Convert a height dimension when the user switches Fixed / Relative / Fill. */
-export function convertDimensionUnit(current: Dimension, nextUnit: Unit, parentPx: number): Dimension {
+/**
+ * Convert a dimension when the user switches Fixed / Relative / Fill / Fit content.
+ *
+ * `measuredPx` is the block's actual rendered size (auto/fit-content has no
+ * stored pixel value). Without it, converting Fit content → Fixed would
+ * resolve to 0px and collapse the element, so callers should pass the live
+ * measurement whenever available.
+ */
+export function convertDimensionUnit(
+  current: Dimension,
+  nextUnit: Unit,
+  parentPx: number,
+  measuredPx?: number
+): Dimension {
   const safeParent = Math.max(parentPx, 1);
-  const px = resolveHeightToPx(current, safeParent);
+  const hasMeasured = typeof measuredPx === "number" && measuredPx > 0;
+  const px =
+    current.unit === "fit-content" && hasMeasured
+      ? (measuredPx as number)
+      : resolveHeightToPx(current, safeParent);
 
   switch (nextUnit) {
     case "px":
       return dim(Math.max(0, Math.round(px)), "px");
-    case "%":
+    case "%": {
+      if (current.unit === "fit-content" && !hasMeasured && px <= 0) {
+        return dim(100, "%");
+      }
       return dim(Math.max(0, Math.round((px / safeParent) * 100)), "%");
+    }
     case "fill":
       return dim(Math.round(safeParent), "fill");
     case "fit-content":
@@ -38,6 +58,23 @@ export function convertDimensionUnit(current: Dimension, nextUnit: Unit, parentP
     default:
       return { ...current, unit: nextUnit };
   }
+}
+
+/**
+ * Live-measure a block's rendered CSS-pixel size from the canvas. Returns null
+ * outside the browser or when the block element is not mounted. Values are
+ * un-zoomed (divided by the canvas zoom) so they map back to style units.
+ */
+export function measureBlockSizePx(
+  blockId: string,
+  zoom: number
+): { width: number; height: number } | null {
+  if (typeof document === "undefined") return null;
+  const el = document.querySelector(`[data-resize-target="${CSS.escape(blockId)}"]`);
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  const z = zoom > 0 ? zoom : 1;
+  return { width: rect.width / z, height: rect.height / z };
 }
 
 function resolveStackFrameHeightPx(stack: StackBlock, outerPx: number): number {

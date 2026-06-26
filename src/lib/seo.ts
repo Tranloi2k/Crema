@@ -52,6 +52,11 @@ export function buildPageMetadata({
     title: pageTitle,
     description,
     keywords,
+    icons: {
+      icon: "/logo.png",
+      shortcut: "/logo.png",
+      apple: "/logo.png",
+    },
     applicationName: SITE_NAME,
     creator: SITE_NAME,
     publisher: SITE_NAME,

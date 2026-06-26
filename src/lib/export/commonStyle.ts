@@ -6,11 +6,14 @@ function hasVisibleRadius(style: ReturnType<typeof withCommonDefaults>): boolean
   return c.topLeft > 0 || c.topRight > 0 || c.bottomRight > 0 || c.bottomLeft > 0;
 }
 
-export function commonStyleToReactStyle(style: Partial<CommonStyle>): CSSProperties {
+export function commonStyleToReactStyle(
+  style: Partial<CommonStyle>,
+  options?: { skipBackground?: boolean }
+): CSSProperties {
   const s = withCommonDefaults(style);
   const css: CSSProperties = {};
 
-  if (s.bgColor) css.backgroundColor = s.bgColor;
+  if (s.bgColor && !options?.skipBackground) css.backgroundColor = s.bgColor;
   if (s.border.width > 0) {
     css.borderWidth = s.border.width;
     css.borderColor = s.border.color;
@@ -35,12 +38,12 @@ export function commonStyleToReactStyle(style: Partial<CommonStyle>): CSSPropert
 
 export function commonStyleToCssString(
   style: Partial<CommonStyle>,
-  options?: { clipRadius?: boolean }
+  options?: { clipRadius?: boolean; skipBackground?: boolean }
 ): string {
   const s = withCommonDefaults(style);
   const declarations: string[] = [];
 
-  if (s.bgColor) declarations.push(`background-color:${s.bgColor}`);
+  if (s.bgColor && !options?.skipBackground) declarations.push(`background-color:${s.bgColor}`);
   if (s.border.width > 0) {
     declarations.push(`border:${s.border.width}px ${s.border.style} ${s.border.color}`);
   }

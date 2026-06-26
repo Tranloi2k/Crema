@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Eye, Send } from "lucide-react";
+import { ArrowLeft, Download, Eye, Redo2, Send, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useEditorStore } from "@/lib/store/editorStore";
@@ -19,6 +19,10 @@ export function Toolbar({
   const setName = useEditorStore((s) => s.setName);
   const dirty = useEditorStore((s) => s.dirty);
   const root = useEditorStore((s) => s.root);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
+  const canUndo = useEditorStore((s) => s.past.length > 0);
+  const canRedo = useEditorStore((s) => s.future.length > 0);
   const [sending, setSending] = useState(false);
   const [testEmail, setTestEmail] = useState("");
 
@@ -73,6 +77,26 @@ export function Toolbar({
       <div className="flex items-center gap-2">
         {!readOnly && (
           <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              onClick={redo}
+              disabled={!canRedo}
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
             <Input
               placeholder="test@email.com"
               value={testEmail}

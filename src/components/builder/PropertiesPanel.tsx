@@ -21,11 +21,12 @@ import {
   Row,
   ColorField,
   UnitInput,
-  WidthUnitInput,
   HeightUnitInput,
+  BlockSizeSection,
   SidesInput,
   CornersInput,
   SelectInput,
+  FontFamilySelect,
   AlignSelect,
   FlexAlignSelect,
   FlexJustifySelect,
@@ -184,7 +185,7 @@ function TextProperties({ block }: { block: TextBlock }) {
       </Section>
       <Section title="Typography">
         <Row label="Font">
-          <SelectInput
+          <FontFamilySelect
             value={block.style.fontFamily}
             options={FONT_OPTIONS}
             onChange={(fontFamily) =>
@@ -207,6 +208,34 @@ function TextProperties({ block }: { block: TextBlock }) {
             value={block.style.fontSize}
             onChange={(e) =>
               updateBlock(block.id, { style: { ...block.style, fontSize: Number(e.target.value) } })
+            }
+            className="h-7 text-xs"
+          />
+        </Row>
+        <Row label="Line H">
+          <Input
+            type="number"
+            min={0.5}
+            max={5}
+            step={0.1}
+            value={block.style.lineHeight ?? 1.5}
+            onChange={(e) =>
+              updateBlock(block.id, {
+                style: { ...block.style, lineHeight: Number(e.target.value) },
+              })
+            }
+            className="h-7 text-xs"
+          />
+        </Row>
+        <Row label="Letter">
+          <Input
+            type="number"
+            step={0.5}
+            value={block.style.letterSpacing ?? 0}
+            onChange={(e) =>
+              updateBlock(block.id, {
+                style: { ...block.style, letterSpacing: Number(e.target.value) },
+              })
             }
             className="h-7 text-xs"
           />
@@ -262,19 +291,14 @@ function TextProperties({ block }: { block: TextBlock }) {
         </Row>
       </Section>
       <Section title="Layout">
-        <Row label="Width">
-          <UnitInput
-            value={width}
-            onChange={(w) => updateBlock(block.id, { style: { ...block.style, width: w } })}
-          />
-        </Row>
-        <Row label="Height">
-          <HeightUnitInput
-            blockId={block.id}
-            value={height}
-            onChange={(h) => updateBlock(block.id, { style: { ...block.style, height: h } })}
-          />
-        </Row>
+        <BlockSizeSection
+          block={block}
+          width={width}
+          height={height}
+          onSizeChange={(w, h) =>
+            updateBlock(block.id, { style: { ...block.style, width: w, height: h } })
+          }
+        />
         <Row label="Padding" align="start">
           <SidesInput
             value={padding}
@@ -404,20 +428,14 @@ function ImageProperties({
         </Row>
       </Section>
       <Section title="Size">
-        <Row label="Width">
-          <WidthUnitInput
-            blockId={block.id}
-            value={width}
-            onChange={(w) => updateBlock(block.id, { style: { ...block.style, width: w } })}
-          />
-        </Row>
-        <Row label="Height">
-          <HeightUnitInput
-            blockId={block.id}
-            value={height}
-            onChange={(h) => updateBlock(block.id, { style: { ...block.style, height: h } })}
-          />
-        </Row>
+        <BlockSizeSection
+          block={block}
+          width={width}
+          height={height}
+          onSizeChange={(w, h) =>
+            updateBlock(block.id, { style: { ...block.style, width: w, height: h } })
+          }
+        />
       </Section>
       <Section title="Layout">
         <Row label="Align">
@@ -443,6 +461,8 @@ function ButtonProperties({ block }: { block: ButtonBlock }) {
   const labelRef = useRef<HTMLInputElement>(null);
   const hrefRef = useRef<HTMLInputElement>(null);
   const padding = toSides(block.style.padding);
+  const width = toDimension(block.style.width, dim(0, "fit-content"));
+  const height = toDimension(block.style.height, dim(0, "fit-content"));
   return (
     <>
       <Section title="Content">
@@ -519,6 +539,16 @@ function ButtonProperties({ block }: { block: ButtonBlock }) {
             className="h-7 text-xs"
           />
         </Row>
+      </Section>
+      <Section title="Size">
+        <BlockSizeSection
+          block={block}
+          width={width}
+          height={height}
+          onSizeChange={(w, h) =>
+            updateBlock(block.id, { style: { ...block.style, width: w, height: h } })
+          }
+        />
       </Section>
       <Section title="Layout">
         <Row label="Align">
@@ -605,20 +635,14 @@ function StackProperties({ block }: { block: StackBlock }) {
   return (
     <>
       <Section title="Size">
-        <Row label="Width">
-          <WidthUnitInput
-            blockId={block.id}
-            value={width}
-            onChange={(w) => updateBlock(block.id, { style: { ...block.style, width: w } })}
-          />
-        </Row>
-        <Row label="Height">
-          <HeightUnitInput
-            blockId={block.id}
-            value={height}
-            onChange={(h) => updateBlock(block.id, { style: { ...block.style, height: h } })}
-          />
-        </Row>
+        <BlockSizeSection
+          block={block}
+          width={width}
+          height={height}
+          onSizeChange={(w, h) =>
+            updateBlock(block.id, { style: { ...block.style, width: w, height: h } })
+          }
+        />
       </Section>
       <Section title="Layout">
         <Row label="Direction">

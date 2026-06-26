@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Dimension } from "@/lib/types";
 import { dimToCss } from "@/lib/types";
+import { isFillWidth, isPercentWidth } from "@/lib/layout/dimensions";
 
 export function imageSizeCss(width: Dimension, height: Dimension) {
   const widthCss = dimToCss(width);
@@ -51,4 +52,22 @@ export function imageToHtmlAttrs(width: Dimension, height: Dimension) {
     heightAttr: heightAttr !== undefined ? ` height="${heightAttr}"` : "",
     style: `display:block;width:${widthCss};max-width:100%;height:${heightCss};border:0;${objectFitCss}`,
   };
+}
+
+/**
+ * Shrink-wrap a row-stack image cell to the image width (email table trick).
+ * Without this, the <td> grows wider than the <img> and misaligns row layouts.
+ */
+export function imageRowCellWidthCss(width: Dimension, inRowStack: boolean): string {
+  if (!inRowStack || isFillWidth(width) || isPercentWidth(width)) return "";
+  if (width.unit === "px" && width.value > 0) {
+    return `width:${width.value}px;white-space:nowrap;`;
+  }
+  return "width:1%;white-space:nowrap;";
+}
+
+export function imageRowCellWidthAttr(width: Dimension, inRowStack: boolean): string {
+  if (!inRowStack || isFillWidth(width) || isPercentWidth(width)) return "";
+  if (width.unit === "px" && width.value > 0) return ` width="${width.value}"`;
+  return ' width="1"';
 }

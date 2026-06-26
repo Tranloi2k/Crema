@@ -65,8 +65,10 @@ function LayerRow({
   canDrag?: boolean;
   isRoot?: boolean;
 }) {
-  const selectedBlockId = useEditorStore((s) => s.selectedBlockId);
+  const selectedBlockIds = useEditorStore((s) => s.selectedBlockIds);
   const selectBlock = useEditorStore((s) => s.selectBlock);
+  const toggleBlockSelection = useEditorStore((s) => s.toggleBlockSelection);
+  const extendSelectionTo = useEditorStore((s) => s.extendSelectionTo);
   const [expanded, setExpanded] = useState(true);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -76,9 +78,19 @@ function LayerRow({
   });
 
   const isStack = block.type === "stack";
-  const isSelected = selectedBlockId === block.id;
+  const isSelected = selectedBlockIds.includes(block.id);
   const Icon = ICONS[block.type];
   const indicator = useDropIndicator(block.id);
+
+  const handleSelect = (e: React.MouseEvent) => {
+    if (isRoot) {
+      selectBlock(block.id);
+      return;
+    }
+    if (e.shiftKey) extendSelectionTo(block.id);
+    else if (e.ctrlKey || e.metaKey) toggleBlockSelection(block.id);
+    else selectBlock(block.id);
+  };
 
   return (
     <div className="relative">
@@ -103,26 +115,25 @@ function LayerRow({
           }}
           onClick={(e) => {
             e.stopPropagation();
-            selectBlock(block.id);
+            handleSelect(e);
           }}
           onContextMenu={(e) => {
             e.stopPropagation();
-            selectBlock(block.id);
+            // Keep an existing multi-selection when right-clicking one of its rows.
+            if (!selectedBlockIds.includes(block.id)) selectBlock(block.id);
           }}
           className={cn(
             "flex items-center gap-1.5 rounded py-1.5 pr-2 text-xs transition-colors",
-            canDrag && "cursor-grab",
             isSelected
               ? "bg-primary text-primary-foreground shadow-sm"
               : "hover:bg-muted active:bg-muted/80",
             isDragging && "opacity-50",
             indicator.showStackBorder && "ring-2 ring-primary ring-inset"
           )}
-          {...(canDrag ? attributes : {})}
-          {...(canDrag ? listeners : {})}
         >
           {isStack ? (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setExpanded((v) => !v);
@@ -134,8 +145,17 @@ function LayerRow({
           ) : (
             <span className="w-3 shrink-0" />
           )}
-          <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="truncate">{labelFor(block)}</span>
+          <div
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-1.5",
+              canDrag && "cursor-grab active:cursor-grabbing"
+            )}
+            {...(canDrag ? attributes : {})}
+            {...(canDrag ? listeners : {})}
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="truncate">{labelFor(block)}</span>
+          </div>
         </div>
       </BlockContextMenu>
       {isStack && expanded && <LayerStackChildren block={block} depth={depth + 1} />}

@@ -9,15 +9,17 @@ import { StackBlock } from "@/components/builder/blocks/StackBlock";
 export function BlockRenderer({
   block,
   compactWidth,
+  crossAxisFill,
 }: {
   block: Block;
   compactWidth?: boolean;
+  crossAxisFill?: boolean;
 }) {
   switch (block.type) {
     case "text":
-      return <TextBlock block={block} compactWidth={compactWidth} />;
+      return <TextBlock block={block} compactWidth={compactWidth} crossAxisFill={crossAxisFill} />;
     case "image":
-      return <ImageBlock block={block} />;
+      return <ImageBlock block={block} compactWidth={compactWidth} />;
     case "button":
       return <ButtonBlock block={block} />;
     case "divider":

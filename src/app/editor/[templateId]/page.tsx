@@ -57,7 +57,8 @@ export default function EditorPage() {
   const [locked, setLocked] = useState(false);
   const [canUpload, setCanUpload] = useState(false);
   const [tool, setTool] = useState<Tool>("select");
-  const [zoom, setZoom] = useState(1);
+  const zoom = useEditorStore((s) => s.zoom);
+  const setZoom = useEditorStore((s) => s.setZoom);
 
   const readOnly = locked;
 

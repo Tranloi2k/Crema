@@ -11,7 +11,7 @@ import {
   type TextTransform,
   type TextVerticalAlign,
 } from "@/lib/types";
-import type { FlexJustify } from "@/lib/types";
+import type { FlexJustify, FlexAlign } from "@/lib/types";
 import { isFillHeight, isPercentHeight } from "@/lib/layout/dimensions";
 import { isDistributedJustify } from "@/lib/layout/flexAlign";
 
@@ -22,6 +22,8 @@ export function normalizeTextTypography(style: Partial<TextBlock["style"]>) {
     textDecoration: (style.textDecoration ?? "none") as TextDecoration,
     fontStyle: (style.fontStyle ?? "normal") as FontStyle,
     verticalAlign: (style.verticalAlign ?? "top") as TextVerticalAlign,
+    lineHeight: style.lineHeight ?? 1.5,
+    letterSpacing: style.letterSpacing ?? 0,
   };
 }
 
@@ -33,11 +35,11 @@ export function hasFixedTextHeight(style: Partial<TextBlock["style"]>): boolean 
 /** HTML export — only use fixed-height frames when height is px/% or fill inside a sized parent. */
 export function hasExportFixedTextHeight(
   style: Partial<TextBlock["style"]>,
-  ctx?: { parentHasHeight?: boolean }
+  ctx?: { inRowStack?: boolean; parentHasHeight?: boolean }
 ): boolean {
   const height = toDimension(style.height, dim(0, "fit-content"));
   if (height.unit === "px" || height.unit === "%") return true;
-  if (height.unit === "fill" && ctx?.parentHasHeight) return true;
+  if (height.unit === "fill" && (ctx?.parentHasHeight || ctx?.inRowStack)) return true;
   return false;
 }
 
@@ -52,25 +54,34 @@ function applyTextFrameLayout(css: CSSProperties) {
   css.flexDirection = "column";
   css.overflow = "hidden";
   css.minHeight = 0;
+  css.minWidth = 0;
 }
 
 /** Outer text frame — fixed size with border-box (Framer-style frame). */
-export function textBoxToReactStyle(style: Partial<TextBlock["style"]>): CSSProperties {
+export function textBoxToReactStyle(
+  style: Partial<TextBlock["style"]>,
+  options?: { crossAxisFill?: boolean }
+): CSSProperties {
   const width = toDimension(style.width, dim(0, "fill"));
   const height = toDimension(style.height, dim(0, "fit-content"));
-  const css: CSSProperties = { boxSizing: "border-box" };
+  // Never let a text frame grow wider than the slot it sits in (prevents long
+  // unbroken lines from pushing past a fill/% parent in the editor canvas).
+  const css: CSSProperties = { boxSizing: "border-box", maxWidth: "100%", minWidth: 0 };
 
   if (width.unit !== "fit-content") css.width = dimToCss(width);
   if (width.unit === "fill") {
-    css.maxWidth = "100%";
     css.alignSelf = "stretch";
   }
 
   if (isFillHeight(height)) {
     applyTextFrameLayout(css);
-    css.flex = "1 1 0%";
     css.alignSelf = "stretch";
     css.width = css.width ?? "100%";
+    if (options?.crossAxisFill) {
+      css.height = "100%";
+    } else {
+      css.flex = "1 1 0%";
+    }
   } else if (isPercentHeight(height)) {
     applyTextFrameLayout(css);
     css.height = dimToCss(height);
@@ -104,7 +115,8 @@ export function textInnerLayoutStyle(style: Partial<TextBlock["style"]>): CSSPro
 
 export function textTypographyToCss(style: Partial<TextBlock["style"]>): string {
   const fontFamily = style.fontFamily || DEFAULT_FONT_FAMILY;
-  const { fontWeight, textTransform, textDecoration, fontStyle } = normalizeTextTypography(style);
+  const { fontWeight, textTransform, textDecoration, fontStyle, lineHeight, letterSpacing } =
+    normalizeTextTypography(style);
   return [
     `text-align:${style.align ?? "left"}`,
     `color:${style.color ?? "#1a1a1a"}`,
@@ -114,8 +126,29 @@ export function textTypographyToCss(style: Partial<TextBlock["style"]>): string 
     `text-transform:${textTransform}`,
     `text-decoration:${textDecoration}`,
     `font-style:${fontStyle}`,
-    "line-height:1.5",
+    `line-height:${lineHeight}`,
+    `letter-spacing:${letterSpacing}px`,
   ].join(";");
+}
+
+/** Nested table attrs for fixed-height text — stretches to the outer cell in row stacks. */
+export function textExportInnerTableCss(fixedHeight: boolean): string {
+  if (!fixedHeight) return "border-collapse:collapse;";
+  return "border-collapse:collapse;width:100%;height:100%;";
+}
+
+export function textExportInnerTableAttrs(fixedHeight: boolean): string {
+  return fixedHeight ? ' width="100%" height="100%"' : "";
+}
+
+export function textExportInnerCellCss(
+  typography: string,
+  valign: TextVerticalAlign,
+  nowrap: string,
+  fixedHeight: boolean
+): string {
+  const heightCss = fixedHeight ? "height:100%;" : "";
+  return `${typography};${nowrap}vertical-align:${valign};${heightCss}`;
 }
 
 export function textVerticalAlignToCss(style: Partial<TextBlock["style"]>): string {
@@ -123,9 +156,17 @@ export function textVerticalAlignToCss(style: Partial<TextBlock["style"]>): stri
   return `vertical-align:${verticalAlign};`;
 }
 
+/** Row-stack cross-axis alignment for fit-content text cells (uses stack align, not block verticalAlign). */
+export function stackCrossAlignToVerticalCss(align?: FlexAlign): string {
+  if (align === "center") return "vertical-align:middle;";
+  if (align === "end") return "vertical-align:bottom;";
+  return "vertical-align:top;";
+}
+
 export function textTypographyToReactStyle(style: Partial<TextBlock["style"]>): CSSProperties {
   const fontFamily = style.fontFamily || DEFAULT_FONT_FAMILY;
-  const { fontWeight, textTransform, textDecoration, fontStyle } = normalizeTextTypography(style);
+  const { fontWeight, textTransform, textDecoration, fontStyle, lineHeight, letterSpacing } =
+    normalizeTextTypography(style);
   return {
     textAlign: style.align ?? "left",
     color: style.color ?? "#1a1a1a",
@@ -135,9 +176,27 @@ export function textTypographyToReactStyle(style: Partial<TextBlock["style"]>): 
     textTransform,
     textDecoration,
     fontStyle,
-    lineHeight: 1.5,
+    lineHeight,
+    letterSpacing: `${letterSpacing}px`,
     width: "100%",
   };
+}
+
+/** CSS custom properties for live TipTap typography (updates without re-mounting the editor). */
+export function textTypographyToCssVars(style: Partial<TextBlock["style"]>): CSSProperties {
+  const t = textTypographyToReactStyle(style);
+  return {
+    "--crema-text-font-family": t.fontFamily,
+    "--crema-text-font-size": `${t.fontSize}px`,
+    "--crema-text-color": t.color,
+    "--crema-text-font-weight": String(t.fontWeight),
+    "--crema-text-align": t.textAlign,
+    "--crema-text-transform": t.textTransform,
+    "--crema-text-decoration": t.textDecoration,
+    "--crema-text-font-style": t.fontStyle,
+    "--crema-text-line-height": String(t.lineHeight),
+    "--crema-text-letter-spacing": t.letterSpacing,
+  } as CSSProperties;
 }
 
 export function textSizeToCss(
@@ -154,11 +213,13 @@ export function textSizeToCss(
       parts.push("max-width:100%");
     } else {
       parts.push(`width:${dimToCss(width)}`);
+      // Keep fixed (px) / relative (%) text from overflowing narrow mobile screens.
+      if (width.unit === "px" || width.unit === "%") parts.push("max-width:100%");
     }
   }
   if (height.unit === "px" || height.unit === "%") {
     parts.push(`height:${dimToCss(height)}`);
-  } else if (height.unit === "fill" && options?.parentHasHeight) {
+  } else if (height.unit === "fill" && (options?.parentHasHeight || options?.inRowStack)) {
     parts.push("height:100%");
   }
   if (width.unit === "fill" && !options?.inRowStack) parts.push("max-width:100%");

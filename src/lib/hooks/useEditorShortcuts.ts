@@ -11,21 +11,46 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 export function useEditorShortcuts() {
-  const root = useEditorStore((s) => s.root);
-  const selectedBlockId = useEditorStore((s) => s.selectedBlockId);
-  const duplicateBlock = useEditorStore((s) => s.duplicateBlock);
-
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) return;
-      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "d") return;
-      if (!selectedBlockId || selectedBlockId === root.id) return;
 
-      e.preventDefault();
-      duplicateBlock(selectedBlockId);
+      const state = useEditorStore.getState();
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      // Undo / redo.
+      if (mod && key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) state.redo();
+        else state.undo();
+        return;
+      }
+      if (mod && key === "y") {
+        e.preventDefault();
+        state.redo();
+        return;
+      }
+
+      // Duplicate.
+      if (mod && key === "d") {
+        if (!state.selectedBlockId || state.selectedBlockId === state.root.id) return;
+        e.preventDefault();
+        state.duplicateBlock(state.selectedBlockId);
+        return;
+      }
+
+      // Delete / Backspace removes the current selection (single or multi).
+      if (key === "delete" || key === "backspace") {
+        const ids = state.selectedBlockIds.filter((id) => id !== state.root.id);
+        if (ids.length === 0) return;
+        e.preventDefault();
+        state.removeBlocks(ids);
+        return;
+      }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedBlockId, root.id, duplicateBlock]);
+  }, []);
 }

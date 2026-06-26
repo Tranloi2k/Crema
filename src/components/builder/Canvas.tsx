@@ -73,7 +73,7 @@ export function Canvas({ root, zoom, tool }: { root: StackBlock; zoom: number; t
               ...commonStyleToReactStyle(root.style),
             }}
             className={cn(
-              "bg-white shadow-sm ring-1 ring-border",
+              "min-w-0 bg-white shadow-sm ring-1 ring-border",
               needsHeightFrame && "min-h-0",
               tool === "pan" && "pointer-events-none"
             )}

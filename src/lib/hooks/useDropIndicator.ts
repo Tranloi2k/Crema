@@ -1,7 +1,8 @@
 "use client";
 
 import { useDndContext } from "@dnd-kit/core";
-import { useEditorStore, findBlock } from "@/lib/store/editorStore";
+import { useEditorStore, findBlock, isAncestorBlock } from "@/lib/store/editorStore";
+import { computeRowPlacement } from "@/lib/dnd/dropIntent";
 
 export interface DropIndicator {
   /** Show a blue ring around the whole block (used for Stack drop targets). */
@@ -26,6 +27,7 @@ export function useDropIndicator(blockId: string): DropIndicator {
   }
 
   const overId = String(over.id);
+  // Empty-stack drop zones: ring around the stack they belong to.
   if (overId === `stack-drop-${blockId}` || overId === `layer-drop-${blockId}`) {
     return { showStackBorder: true, showLineAbove: false, showLineBelow: false };
   }
@@ -35,20 +37,15 @@ export function useDropIndicator(blockId: string): DropIndicator {
   }
 
   const overBlock = findBlock(root, blockId);
-  if (overBlock?.type === "stack") {
-    return { showStackBorder: true, showLineAbove: false, showLineBelow: false };
-  }
+  const activeId = String(active.id);
+  const overIsStack =
+    overBlock?.type === "stack" && !isAncestorBlock(root, activeId, blockId);
 
-  // Sibling reorder/insert: position the line based on whether the dragged
-  // item is currently above or below the over item. Falls back to "above" if
-  // rect info isn't available yet (very start of drag).
-  const activeTop = active.rect.current?.translated?.top ?? 0;
-  const overRect = over.rect;
-  const overMid = overRect.top + overRect.height / 2;
-  const above = activeTop < overMid;
+  const placement = computeRowPlacement(active, over, overIsStack);
+
   return {
-    showStackBorder: false,
-    showLineAbove: above,
-    showLineBelow: !above,
+    showStackBorder: placement === "inside",
+    showLineAbove: placement === "before",
+    showLineBelow: placement === "after",
   };
 }

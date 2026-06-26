@@ -1,6 +1,7 @@
 import type { DragEndEvent, UniqueIdentifier } from "@dnd-kit/core";
 import type { Block, StackBlock } from "@/lib/types";
-import { findBlock } from "@/lib/store/editorStore";
+import { findBlock, getParentStack, isAncestorBlock } from "@/lib/store/editorStore";
+import { computeRowPlacement, type DropPlacement } from "@/lib/dnd/dropIntent";
 
 const DROP_PREFIXES = ["stack-drop-", "layer-drop-"] as const;
 
@@ -12,19 +13,14 @@ function parseDroppableStackId(id: UniqueIdentifier): string | null {
   return null;
 }
 
-function insertIndex(
+function insertIndexByPlacement(
   containerArr: Block[],
   overId: string,
-  active: DragEndEvent["active"],
-  over: NonNullable<DragEndEvent["over"]>
+  placement: DropPlacement
 ): number {
   const overIndex = containerArr.findIndex((b) => b.id === overId);
   if (overIndex === -1) return containerArr.length;
-
-  const activeTop = active.rect.current.translated?.top ?? active.rect.current.initial?.top ?? 0;
-  const overMid = over.rect.top + over.rect.height / 2;
-  const insertAfter = activeTop > overMid;
-  return insertAfter ? overIndex + 1 : overIndex;
+  return placement === "after" ? overIndex + 1 : overIndex;
 }
 
 export interface DropTarget {
@@ -44,25 +40,45 @@ export function resolveDropTarget(
   if (!over) return null;
 
   const overId = String(over.id);
+  const activeId = String(active.id);
 
+  // Empty-stack drop zones → always append inside that stack.
   const droppableStackId = parseDroppableStackId(overId);
   if (droppableStackId) {
     const arr = getContainerArray(droppableStackId);
     return { containerId: droppableStackId, index: arr.length, appendIntoStack: true };
   }
 
-  let overContainerId = (over.data.current as { containerId?: string } | undefined)?.containerId;
+  const overContainerId = (over.data.current as { containerId?: string } | undefined)?.containerId;
   if (!overContainerId) return null;
 
   const overBlock = findBlock(root, overId);
-  let appendIntoStack = false;
-  if (overBlock?.type === "stack" && overId !== String(active.id)) {
-    overContainerId = overBlock.id;
-    appendIntoStack = true;
+  // A stack row offers a center "drop inside" band — unless it's the dragged
+  // block itself or one of its descendants (which would be an invalid move).
+  const overIsStack =
+    overBlock?.type === "stack" &&
+    overId !== activeId &&
+    !isAncestorBlock(root, activeId, overId);
+
+  const placement = computeRowPlacement(active, over, overIsStack);
+
+  // Drop inside the hovered stack (append to its children).
+  if (placement === "inside" && overBlock?.type === "stack") {
+    const arr = getContainerArray(overId);
+    return { containerId: overId, index: arr.length, appendIntoStack: true };
   }
 
-  const containerArr = getContainerArray(overContainerId);
-  const index = appendIntoStack ? containerArr.length : insertIndex(containerArr, overId, active, over);
+  // Sibling reorder: stack rows reorder at their parent level; everything else
+  // reorders within the container that owns the hovered block.
+  let containerId = overContainerId;
+  if (overBlock?.type === "stack") {
+    const parent = getParentStack(root, overId);
+    if (!parent) return null;
+    containerId = parent.id;
+  }
 
-  return { containerId: overContainerId, index, appendIntoStack };
+  const containerArr = getContainerArray(containerId);
+  const index = insertIndexByPlacement(containerArr, overId, placement);
+
+  return { containerId, index, appendIntoStack: false };
 }

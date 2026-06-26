@@ -127,8 +127,8 @@ export function PreviewModal({
           <div className="mx-auto flex justify-center">
             <div
               className={cn(
-                "overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-black/5 transition-[width] duration-200",
-                mode === "mobile" && "rounded-[1.25rem] ring-2 ring-black/10"
+                "bg-white shadow-lg ring-1 ring-black/5 transition-[width] duration-200",
+                mode === "mobile" && "ring-2 ring-black/10"
               )}
               style={{ width: previewWidth, maxWidth: "100%" }}
             >

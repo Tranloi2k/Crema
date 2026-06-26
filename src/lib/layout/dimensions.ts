@@ -6,11 +6,27 @@ export function getBlockHeightDim(block: Block): Dimension {
     case "text":
     case "image":
     case "stack":
+    case "button":
       return toDimension(block.style.height, dim(0, "fit-content"));
     case "spacer":
       return toDimension(block.style.height, dim(24));
     default:
       return dim(0, "fit-content");
+  }
+}
+
+/** Which axes can be drag-resized on the canvas for a given block type. */
+export function blockResizableAxes(block: Block): { width: boolean; height: boolean } {
+  switch (block.type) {
+    case "text":
+    case "image":
+    case "button":
+    case "stack":
+      return { width: true, height: true };
+    case "spacer":
+      return { width: false, height: true };
+    default:
+      return { width: false, height: false };
   }
 }
 
@@ -20,6 +36,8 @@ export function getBlockWidthDim(block: Block): Dimension | null {
       return toDimension(block.style.width, dim(0, "fill"));
     case "image":
       return toDimension(block.style.width, dim(560));
+    case "button":
+      return toDimension(block.style.width, dim(0, "fit-content"));
     case "stack":
       return toDimension(block.style.width, dim(0, "fit-content"));
     default:
@@ -30,7 +48,12 @@ export function getBlockWidthDim(block: Block): Dimension | null {
 export function blockUsesFillWidth(block: Block): boolean {
   const w = getBlockWidthDim(block);
   if (!w) return false;
-  return w.unit === "fill" || w.unit === "%";
+  return isFillWidth(w) || isPercentWidth(w);
+}
+
+/** Blocks with a definite content width (px / fit-content) — not fill or %. */
+export function blockShrinksToContentWidth(block: Block): boolean {
+  return !blockUsesFillWidth(block);
 }
 
 /** Whether a stack child should span the cross axis (e.g. full width in a column stack). */
@@ -39,6 +62,9 @@ export function childFillsStackCrossAxis(block: Block, isRow: boolean): boolean 
     return blockUsesFlexHeight(block) || isFillHeight(getBlockHeightDim(block));
   }
   if (block.type === "divider") return true;
+  // A button always occupies a full-width row slot (like the table-based
+  // export), then sizes/aligns itself inside via its own width + align.
+  if (block.type === "button") return true;
   return blockUsesFillWidth(block);
 }
 
@@ -53,6 +79,29 @@ export function childFillsStackMainAxis(
   return isFillHeight(getBlockHeightDim(block));
 }
 
+/** Whether any child grows along the stack main axis (flex-1). */
+export function stackHasFillMainChild(stack: StackBlock): boolean {
+  const isRow = stack.style.direction === "row";
+  const justify = stack.style.justify ?? "start";
+  return stack.children.some((c) => childFillsStackMainAxis(c, isRow, justify));
+}
+
+/**
+ * Row stacks that should collapse to a single column below 480px.
+ * Compact rows (logo + label, icon + text) stay horizontal when they fit.
+ */
+export function rowShouldStackOnMobile(stack: StackBlock): boolean {
+  const justify = stack.style.justify ?? "start";
+  const children = stack.children;
+  if (children.length <= 1) return false;
+  if (isDistributedJustify(justify)) return true;
+
+  const fillMainCount = children.filter((c) => childFillsStackMainAxis(c, true, justify)).length;
+  if (fillMainCount >= 2) return true;
+  if (children.length >= 3) return true;
+  return false;
+}
+
 export function isFitHeight(d: Dimension): boolean {
   return d.unit === "fit-content";
 }
@@ -62,6 +111,14 @@ export function isFillHeight(d: Dimension): boolean {
 }
 
 export function isPercentHeight(d: Dimension): boolean {
+  return d.unit === "%";
+}
+
+export function isFillWidth(d: Dimension): boolean {
+  return d.unit === "fill";
+}
+
+export function isPercentWidth(d: Dimension): boolean {
   return d.unit === "%";
 }
 

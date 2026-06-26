@@ -7,6 +7,7 @@ import { getPlanLimits } from "@/lib/billing/plans";
 import { db } from "@/lib/db/client";
 import { templates, users } from "@/lib/db/schema";
 import { createRootBlock, normalizeRoot } from "@/lib/defaultBlocks";
+import { createWelcomeEmailTemplate } from "@/lib/emails/welcomeEmailTemplate";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -69,12 +70,17 @@ export async function POST(req: Request) {
   const now = new Date();
   const defaultName = `Template ${now.toISOString().slice(0, 16).replace("T", " ")}`;
   const name = typeof body.name === "string" && body.name.trim() ? body.name : defaultName;
+  const preset = typeof body.preset === "string" ? body.preset : "";
+  const content =
+    preset === "welcome"
+      ? createWelcomeEmailTemplate({ useMergeTags: true })
+      : createRootBlock();
   const [created] = await db
     .insert(templates)
     .values({
       userId,
-      name,
-      content: JSON.stringify(createRootBlock()),
+      name: preset === "welcome" ? name.trim() || "Welcome email (new users)" : name,
+      content: JSON.stringify(content),
       createdAt: now,
       updatedAt: now,
       locked: false,

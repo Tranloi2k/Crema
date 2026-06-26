@@ -1,12 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Minus } from "lucide-react";
+import { Plus, Minus, Link2, Unlink2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Dimension, FlexAlign, FlexJustify, Sides, Corners, Unit } from "@/lib/types";
-import { UNIT_OPTIONS, SIZE_UNIT_OPTIONS, sides as makeSides, corners as makeCorners } from "@/lib/types";
-import { convertDimensionUnit, getParentHeightPxForBlock, getParentWidthPxForBlock } from "@/lib/layout/convertDimension";
+import { UNIT_OPTIONS, SIZE_UNIT_OPTIONS, sides as makeSides, corners as makeCorners, dim } from "@/lib/types";
+import {
+  convertDimensionUnit,
+  getParentHeightPxForBlock,
+  getParentWidthPxForBlock,
+  measureBlockSizePx,
+} from "@/lib/layout/convertDimension";
+import {
+  aspectRatioLockPatch,
+  blockSupportsAspectRatioLock,
+  coupleDimensionChange,
+} from "@/lib/layout/aspectRatio";
+import { blockResizableAxes } from "@/lib/layout/dimensions";
+import type { Block } from "@/lib/types";
 import { useEditorStore } from "@/lib/store/editorStore";
 import { cn } from "@/lib/utils";
 
@@ -237,6 +249,32 @@ export function SelectInput<T extends string | number>({
   );
 }
 
+/** Font picker with live preview — options use email-safe system font stacks. */
+export function FontFamilySelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={SELECT_CLASS}
+      style={{ fontFamily: value }}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value} style={{ fontFamily: o.value }}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -276,30 +314,48 @@ export function UnitInput({
   onChange,
   unitOptions = UNIT_OPTIONS,
   parentSizePx,
+  measuredPx,
 }: {
   value: Dimension;
   onChange: (d: Dimension) => void;
   unitOptions?: { label: string; value: Unit }[];
   parentSizePx?: number;
+  /** Live rendered size (px) used so Fit content → Fixed keeps the real size. */
+  measuredPx?: number;
 }) {
   const numericDisabled = value.unit === "fit-content" || value.unit === "fill";
 
   function handleUnitChange(nextUnit: Unit) {
     if (nextUnit === value.unit) return;
     if (parentSizePx !== undefined && parentSizePx > 0) {
-      onChange(convertDimensionUnit(value, nextUnit, parentSizePx));
+      onChange(convertDimensionUnit(value, nextUnit, parentSizePx, measuredPx));
       return;
     }
     onChange({ ...value, unit: nextUnit });
+  }
+
+  function handleValueChange(raw: string) {
+    if (raw === "") {
+      if (numericDisabled) return;
+      onChange({ ...value, value: 0 });
+      return;
+    }
+    const next = Number(raw);
+    if (!Number.isFinite(next)) return;
+    if (numericDisabled) {
+      onChange(dim(next, "px"));
+      return;
+    }
+    onChange({ ...value, value: next });
   }
 
   return (
     <div className="flex w-full gap-1">
       <Input
         type="number"
-        value={value.value}
-        onChange={(e) => onChange({ ...value, value: Number(e.target.value) })}
-        disabled={numericDisabled}
+        value={numericDisabled ? "" : value.value}
+        placeholder={numericDisabled ? "Auto" : undefined}
+        onChange={(e) => handleValueChange(e.target.value)}
         className="h-7 flex-1 text-xs"
       />
       <select
@@ -327,6 +383,7 @@ export function HeightUnitInput({
   onChange: (d: Dimension) => void;
 }) {
   const root = useEditorStore((s) => s.root);
+  const zoom = useEditorStore((s) => s.zoom);
   const parentPx = getParentHeightPxForBlock(root, blockId);
   return (
     <UnitInput
@@ -334,6 +391,7 @@ export function HeightUnitInput({
       onChange={onChange}
       unitOptions={SIZE_UNIT_OPTIONS}
       parentSizePx={parentPx}
+      measuredPx={measureBlockSizePx(blockId, zoom)?.height}
     />
   );
 }
@@ -348,6 +406,7 @@ export function WidthUnitInput({
   onChange: (d: Dimension) => void;
 }) {
   const root = useEditorStore((s) => s.root);
+  const zoom = useEditorStore((s) => s.zoom);
   const parentPx = getParentWidthPxForBlock(root, blockId);
   return (
     <UnitInput
@@ -355,7 +414,117 @@ export function WidthUnitInput({
       onChange={onChange}
       unitOptions={SIZE_UNIT_OPTIONS}
       parentSizePx={parentPx}
+      measuredPx={measureBlockSizePx(blockId, zoom)?.width}
     />
+  );
+}
+
+function AspectRatioLockButton({
+  locked,
+  onToggle,
+}: {
+  locked: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={locked ? "Unlock width/height ratio" : "Lock width/height ratio"}
+      aria-label={locked ? "Unlock width/height ratio" : "Lock width/height ratio"}
+      aria-pressed={locked}
+      className={cn(
+        "inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        locked
+          ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+          : "border-input bg-background text-muted-foreground hover:border-primary/60 hover:bg-muted hover:text-foreground"
+      )}
+    >
+      {locked ? <Link2 className="h-3.5 w-3.5" /> : <Unlink2 className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
+/** Width + optional aspect-ratio lock + height — shared by resizable blocks. */
+export function BlockSizeSection({
+  block,
+  width,
+  height,
+  onSizeChange,
+}: {
+  block: Block;
+  width: Dimension;
+  height: Dimension;
+  onSizeChange: (width: Dimension, height: Dimension) => void;
+}) {
+  const updateBlock = useEditorStore((s) => s.updateBlock);
+  const root = useEditorStore((s) => s.root);
+  const zoom = useEditorStore((s) => s.zoom);
+  const locked = !!block.lockAspectRatio;
+  const ratio = block.aspectRatio;
+  const axes = blockResizableAxes(block);
+  const showLock = blockSupportsAspectRatioLock(block) && axes.width && axes.height;
+
+  function applySize(nextWidth: Dimension, nextHeight: Dimension, unlock?: boolean) {
+    if (unlock) {
+      updateBlock(block.id, {
+        lockAspectRatio: false,
+        aspectRatio: undefined,
+        style: { ...block.style, width: nextWidth, height: nextHeight },
+      } as Partial<Block>);
+      return;
+    }
+    onSizeChange(nextWidth, nextHeight);
+  }
+
+  function handleWidth(next: Dimension) {
+    if (locked && ratio) {
+      const coupled = coupleDimensionChange(block, root, block.id, "width", next, ratio);
+      if (coupled.unlock) {
+        applySize(coupled.width, coupled.height, true);
+        return;
+      }
+      applySize(coupled.width, coupled.height);
+      return;
+    }
+    onSizeChange(next, height);
+  }
+
+  function handleHeight(next: Dimension) {
+    if (locked && ratio) {
+      const coupled = coupleDimensionChange(block, root, block.id, "height", next, ratio);
+      if (coupled.unlock) {
+        applySize(coupled.width, coupled.height, true);
+        return;
+      }
+      applySize(coupled.width, coupled.height);
+      return;
+    }
+    onSizeChange(width, next);
+  }
+
+  function toggleLock() {
+    updateBlock(block.id, aspectRatioLockPatch(block, zoom));
+  }
+
+  return (
+    <>
+      <Row label="Width">
+        <WidthUnitInput blockId={block.id} value={width} onChange={handleWidth} />
+      </Row>
+      {showLock && (
+        <div className="flex items-center gap-2 pl-[96px]">
+          <AspectRatioLockButton locked={locked} onToggle={toggleLock} />
+          <span className="text-[10px] text-muted-foreground">
+            {locked ? "Ratio locked" : "Lock ratio"}
+          </span>
+        </div>
+      )}
+      <Row label="Height">
+        <HeightUnitInput blockId={block.id} value={height} onChange={handleHeight} />
+      </Row>
+    </>
   );
 }
 

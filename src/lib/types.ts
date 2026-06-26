@@ -6,6 +6,10 @@ export interface BaseBlock {
   // User-editable label shown in the Layers panel; when undefined the panel
   // falls back to a per-type heuristic (truncated text, button label, etc.).
   name?: string;
+  /** Editor-only: keep width/height proportional while resizing. */
+  lockAspectRatio?: boolean;
+  /** width ÷ height in px, captured when the lock is enabled. */
+  aspectRatio?: number;
 }
 
 export type Unit = "px" | "%" | "fit-content" | "fill";
@@ -164,13 +168,21 @@ export function withCommonDefaults<T extends Partial<CommonStyle>>(
   };
 }
 
+/** Web-safe system font stacks — reliable in Outlook, Gmail, Apple Mail (no web fonts). */
 export const FONT_OPTIONS: { label: string; value: string }[] = [
   { label: "Arial", value: "Arial, Helvetica, sans-serif" },
+  { label: "Helvetica", value: "Helvetica, Arial, sans-serif" },
+  { label: "Tahoma", value: "Tahoma, Geneva, sans-serif" },
+  { label: "Verdana", value: "Verdana, Geneva, sans-serif" },
+  { label: "Trebuchet MS", value: "'Trebuchet MS', Helvetica, sans-serif" },
+  { label: "Segoe UI", value: "'Segoe UI', Tahoma, Geneva, sans-serif" },
+  { label: "Lucida Sans", value: "'Lucida Sans Unicode', 'Lucida Grande', sans-serif" },
   { label: "Georgia", value: "Georgia, 'Times New Roman', serif" },
   { label: "Times New Roman", value: "'Times New Roman', Times, serif" },
-  { label: "Verdana", value: "Verdana, Geneva, sans-serif" },
-  { label: "Trebuchet MS", value: "'Trebuchet MS', sans-serif" },
+  { label: "Palatino", value: "'Palatino Linotype', 'Book Antiqua', Palatino, serif" },
+  { label: "Garamond", value: "Garamond, 'Times New Roman', serif" },
   { label: "Courier New", value: "'Courier New', Courier, monospace" },
+  { label: "Lucida Console", value: "'Lucida Console', Monaco, monospace" },
 ];
 export const DEFAULT_FONT_FAMILY = FONT_OPTIONS[0].value;
 
@@ -223,6 +235,8 @@ export interface TextBlock extends BaseBlock {
     align: "left" | "center" | "right";
     color: string;
     fontSize: number;
+    lineHeight: number;
+    letterSpacing: number;
     fontFamily: string;
     fontWeight: FontWeight;
     textTransform: TextTransform;
@@ -254,6 +268,8 @@ export interface ButtonBlock extends BaseBlock {
     bgColor: string;
     textColor: string;
     borderRadius: number;
+    width: number | Dimension;
+    height: number | Dimension;
     padding: number | Sides;
   } & CommonStyle;
 }
