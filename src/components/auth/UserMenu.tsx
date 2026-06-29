@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
-import { LogOut, User, CreditCard } from "lucide-react";
+import { HelpCircle, LayoutDashboard, LogOut, User, CreditCard } from "lucide-react";
 import { UserAvatar } from "@/components/auth/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -78,6 +78,17 @@ export function UserMenu() {
             )}
           </div>
           <Link
+            href="/dashboard"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={cn(
+              "flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent"
+            )}
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </Link>
+          <Link
             href="/dashboard/billing"
             role="menuitem"
             onClick={() => setOpen(false)}
@@ -98,6 +109,17 @@ export function UserMenu() {
           >
             <User className="h-4 w-4" />
             Profile
+          </Link>
+          <Link
+            href="/#support"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={cn(
+              "flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent"
+            )}
+          >
+            <HelpCircle className="h-4 w-4" />
+            Support
           </Link>
           <button
             type="button"

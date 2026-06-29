@@ -4,7 +4,9 @@ import { getServerSession } from "next-auth";
 import { Header } from "@/components/home/Header";
 import { Hero } from "@/components/home/Hero";
 import { Features } from "@/components/home/Features";
+import { HowItWorks } from "@/components/home/HowItWorks";
 import { PricingSection } from "@/components/home/PricingSection";
+import { SupportSection } from "@/components/home/SupportSection";
 import { Footer } from "@/components/home/Footer";
 import { HomeJsonLd } from "@/components/seo/HomeJsonLd";
 import { getUserBilling } from "@/lib/billing/getUserBilling";
@@ -35,7 +37,9 @@ export default async function Home() {
       <main className="flex-1">
         <Hero />
         <Features />
+        <HowItWorks />
         <PricingSection initialUsage={initialUsage} />
+        <SupportSection />
       </main>
       <Footer />
     </div>

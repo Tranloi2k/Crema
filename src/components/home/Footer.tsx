@@ -8,6 +8,7 @@ const COLUMNS = [
       { label: "Features", href: "#features" },
       { label: "How it works", href: "#how" },
       { label: "Pricing", href: "#pricing" },
+      { label: "Support", href: "#support" },
     ],
   },
   {
@@ -15,7 +16,7 @@ const COLUMNS = [
     links: [
       { label: "About", href: "#" },
       { label: "Blog", href: "#" },
-      { label: "Contact", href: "#" },
+      { label: "Contact", href: "mailto:support@cremastudio.work" },
     ],
   },
   {
