@@ -15,6 +15,33 @@ const config: Config = {
       screens: { "2xl": "1400px" },
     },
     extend: {
+      fontFamily: {
+        display: ["var(--font-display)"],
+        "display-framer": ["var(--font-display-framer)"],
+        body: ["var(--font-body)"],
+        sans: ["var(--font-body)"],
+      },
+      spacing: {
+        hair: "var(--space-hair)",
+        xxs: "var(--space-xxs)",
+        xs: "var(--space-xs)",
+        sm: "var(--space-sm)",
+        md: "var(--space-md)",
+        lg: "var(--space-lg)",
+        xl: "var(--space-xl)",
+        xxl: "var(--space-xxl)",
+        section: "var(--space-section)",
+      },
+      borderRadius: {
+        xs: "var(--round-xs)",
+        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 2px)",
+        lg: "var(--radius)",
+        xl: "var(--round-xl)",
+        xxl: "var(--round-xxl)",
+        pill: "var(--round-pill)",
+        full: "var(--round-full)",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -49,11 +76,6 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
         "accordion-down": {
