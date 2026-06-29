@@ -5,7 +5,7 @@ import Script from "next/script";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { SessionProvider } from "@/components/providers/SessionProvider";
-import { buildPageMetadata, SITE_NAME, SITE_TAGLINE } from "@/lib/seo";
+import { buildPageMetadata, SITE_TITLE_DEFAULT, SITE_TITLE_TEMPLATE } from "@/lib/seo";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -27,8 +27,8 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   ...buildPageMetadata(),
   title: {
-    default: `${SITE_NAME}: ${SITE_TAGLINE}`,
-    template: `%s | ${SITE_NAME}`,
+    default: SITE_TITLE_DEFAULT,
+    template: SITE_TITLE_TEMPLATE,
   },
 };
 
