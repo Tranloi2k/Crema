@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import type { LemonSubscription } from "@/lib/billing/lemonSqueezy";
+import { getSubscription } from "@/lib/billing/lemonSqueezy";
 import {
   mapLemonSubscriptionStatus,
   processLemonSubscription,
@@ -18,7 +19,28 @@ interface LemonWebhookPayload {
     event_name?: string;
     custom_data?: Record<string, unknown>;
   };
-  data?: LemonSubscription;
+  data?: LemonSubscription | LemonSubscriptionInvoice;
+}
+
+interface LemonSubscriptionInvoice {
+  type: string;
+  id: string;
+  attributes: {
+    subscription_id: number;
+    status: string;
+  };
+}
+
+function isSubscription(data: unknown): data is LemonSubscription {
+  return !!data && typeof data === "object" && (data as LemonSubscription).type === "subscriptions";
+}
+
+function isSubscriptionInvoice(data: unknown): data is LemonSubscriptionInvoice {
+  return (
+    !!data &&
+    typeof data === "object" &&
+    (data as LemonSubscriptionInvoice).type === "subscription-invoices"
+  );
 }
 
 function verifySignature(rawBody: string, signature: string, secret: string): boolean {
@@ -48,36 +70,52 @@ export async function POST(req: Request) {
   }
 
   const eventName = payload.meta?.event_name ?? "";
-  const subscription = payload.data;
+  const data = payload.data;
   const customData = payload.meta?.custom_data;
-
-  if (!subscription || subscription.type !== "subscriptions") {
-    return NextResponse.json({ received: true });
-  }
 
   try {
     switch (eventName) {
       case "subscription_created":
       case "subscription_updated":
       case "subscription_resumed":
-      case "subscription_payment_success":
-        await processLemonSubscription(subscription, customData);
-        break;
       case "subscription_cancelled":
-        await processLemonSubscription(subscription, customData);
+        if (isSubscription(data)) {
+          await processLemonSubscription(data, customData);
+        }
+        break;
+      case "subscription_payment_success":
+      case "subscription_payment_recovered":
+        if (isSubscriptionInvoice(data)) {
+          const subscription = await getSubscription(String(data.attributes.subscription_id));
+          await processLemonSubscription(subscription, customData);
+        } else if (isSubscription(data)) {
+          await processLemonSubscription(data, customData);
+        }
         break;
       case "subscription_expired":
-        await syncCanceledLemonSubscription(subscription, customData);
+        if (isSubscription(data)) {
+          await syncCanceledLemonSubscription(data, customData);
+        }
         break;
       case "subscription_payment_failed": {
         const userId =
           typeof customData?.user_id === "string"
             ? customData.user_id
             : null;
-        if (userId) {
+        if (isSubscriptionInvoice(data)) {
+          const subscription = await getSubscription(String(data.attributes.subscription_id));
+          if (userId) {
+            await db
+              .update(users)
+              .set({ planStatus: mapLemonSubscriptionStatus(subscription.attributes.status) })
+              .where(eq(users.id, userId));
+          } else {
+            await processLemonSubscription(subscription, customData);
+          }
+        } else if (userId && isSubscription(data)) {
           await db
             .update(users)
-            .set({ planStatus: mapLemonSubscriptionStatus(subscription.attributes.status) })
+            .set({ planStatus: mapLemonSubscriptionStatus(data.attributes.status) })
             .where(eq(users.id, userId));
         }
         break;

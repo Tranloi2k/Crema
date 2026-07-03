@@ -7,7 +7,7 @@ import {
   type LemonSubscription,
 } from "@/lib/billing/lemonSqueezy";
 import { isLemonSqueezyConfigured } from "@/lib/billing/lemonSqueezy";
-import { planFromLemonVariantId, type PlanId } from "@/lib/billing/plans";
+import { planFromLemonVariantId, planRank, type PlanId } from "@/lib/billing/plans";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
 
@@ -60,6 +60,51 @@ function subscriptionPeriodEnd(subscription: LemonSubscription): Date | null {
   return raw ? new Date(raw) : null;
 }
 
+/** When a customer has multiple subscriptions (e.g. Pro checkout then Pro+ upgrade), pick the highest tier. */
+export function pickBestEntitledSubscription(
+  subscriptions: LemonSubscription[]
+): LemonSubscription | null {
+  const entitled = subscriptions.filter(isLemonSubscriptionEntitled);
+  if (entitled.length === 0) return null;
+
+  return entitled.reduce((best, current) => {
+    const bestMapped = planFromLemonVariantId(best.attributes.variant_id);
+    const currentMapped = planFromLemonVariantId(current.attributes.variant_id);
+    const bestRank = bestMapped ? planRank(bestMapped.planId) : -1;
+    const currentRank = currentMapped ? planRank(currentMapped.planId) : -1;
+    if (currentRank !== bestRank) {
+      return currentRank > bestRank ? current : best;
+    }
+
+    const bestRenew = best.attributes.renews_at
+      ? new Date(best.attributes.renews_at).getTime()
+      : 0;
+    const currentRenew = current.attributes.renews_at
+      ? new Date(current.attributes.renews_at).getTime()
+      : 0;
+    return currentRenew > bestRenew ? current : best;
+  });
+}
+
+async function listUserSubscriptions(user: {
+  billingCustomerId: string | null;
+  billingSubscriptionId: string | null;
+}): Promise<LemonSubscription[]> {
+  if (user.billingCustomerId) {
+    return listSubscriptionsByCustomer(user.billingCustomerId);
+  }
+
+  if (user.billingSubscriptionId) {
+    try {
+      return [await getSubscription(user.billingSubscriptionId)];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
 export async function syncActiveLemonSubscription(
   subscription: LemonSubscription,
   webhookCustomData?: unknown
@@ -68,7 +113,15 @@ export async function syncActiveLemonSubscription(
   if (!userId) return null;
 
   const mapped = planFromLemonVariantId(subscription.attributes.variant_id);
-  if (!mapped) return null;
+  if (!mapped) {
+    console.error(
+      "syncActiveLemonSubscription: unknown variant_id",
+      subscription.attributes.variant_id,
+      "subscription",
+      subscription.id
+    );
+    return null;
+  }
 
   const customerId = String(subscription.attributes.customer_id);
 
@@ -130,21 +183,9 @@ export async function syncUserSubscription(userId: string) {
     return { synced: false as const, reason: "user_not_found" };
   }
 
-  let subscriptions: LemonSubscription[] = [];
+  let subscriptions = await listUserSubscriptions(user);
 
-  if (user.billingSubscriptionId) {
-    try {
-      subscriptions = [await getSubscription(user.billingSubscriptionId)];
-    } catch {
-      subscriptions = [];
-    }
-  }
-
-  if (subscriptions.length === 0 && user.billingCustomerId) {
-    subscriptions = await listSubscriptionsByCustomer(user.billingCustomerId);
-  }
-
-  const entitled = subscriptions.find(isLemonSubscriptionEntitled);
+  const entitled = pickBestEntitledSubscription(subscriptions);
   if (entitled) {
     const result = await syncActiveLemonSubscription(entitled);
     if (!result) return { synced: false as const, reason: "mapping_failed" };
