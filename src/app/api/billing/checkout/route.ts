@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { createCheckout, isLemonSqueezyConfigured } from "@/lib/billing/lemonSqueezy";
+import { isValidEmail, normalizeEmail } from "@/lib/auth/password";
 import { requireUserId } from "@/lib/billing/requireUser";
 import { isPlanId, lemonVariantId, type PlanId, type PlanInterval } from "@/lib/billing/plans";
 import { getAppBaseUrl } from "@/lib/appUrl";
@@ -32,9 +33,17 @@ export async function POST(req: Request) {
   }
 
   const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
-  if (!user?.email) {
-    return NextResponse.json({ error: "User email is required for checkout." }, { status: 400 });
+  if (!user?.email || !isValidEmail(user.email)) {
+    return NextResponse.json(
+      {
+        error:
+          "A valid email address is required for checkout. Sign in with a real account or update your profile email.",
+      },
+      { status: 400 }
+    );
   }
+
+  const email = normalizeEmail(user.email);
 
   const alreadyOnPlan =
     user.plan === planId &&
@@ -52,7 +61,7 @@ export async function POST(req: Request) {
   try {
     const url = await createCheckout({
       variantId,
-      email: user.email,
+      email,
       name: user.name,
       userId,
       planId,

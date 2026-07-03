@@ -1,5 +1,3 @@
-import { Send } from "lucide-react";
-
 type Feature = {
   visual: "drag" | "html" | "style" | "preview" | "templates" | "send";
   title: string;

@@ -17,7 +17,7 @@ import { seedWelcomeTemplate } from "@/lib/emails/seedWelcomeTemplate";
 const hasGoogle = !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
 const hasGithub = !!process.env.GITHUB_ID && !!process.env.GITHUB_SECRET;
 
-const DEV_USER = { id: "dev-user", name: "Dev User", email: "dev@local" };
+const DEV_USER = { id: "dev-user", name: "Dev User", email: "dev@example.com" };
 
 async function ensureDevUser() {
   const existing = await db.query.users.findFirst({
@@ -25,6 +25,13 @@ async function ensureDevUser() {
   });
   if (!existing) {
     await db.insert(users).values(DEV_USER);
+    return;
+  }
+  if (existing.email !== DEV_USER.email || existing.name !== DEV_USER.name) {
+    await db
+      .update(users)
+      .set({ email: DEV_USER.email, name: DEV_USER.name })
+      .where(eq(users.id, DEV_USER.id));
   }
 }
 

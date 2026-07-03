@@ -14,6 +14,10 @@ export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
+}
+
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, SALT_ROUNDS);
 }

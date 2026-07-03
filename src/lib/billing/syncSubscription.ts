@@ -183,7 +183,7 @@ export async function syncUserSubscription(userId: string) {
     return { synced: false as const, reason: "user_not_found" };
   }
 
-  let subscriptions = await listUserSubscriptions(user);
+  const subscriptions = await listUserSubscriptions(user);
 
   const entitled = pickBestEntitledSubscription(subscriptions);
   if (entitled) {
