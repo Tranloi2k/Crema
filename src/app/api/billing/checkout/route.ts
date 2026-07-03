@@ -66,7 +66,7 @@ export async function POST(req: Request) {
       userId,
       planId,
       interval,
-      redirectUrl: `${baseUrl}/dashboard/billing?success=1`,
+      redirectUrl: `${baseUrl}/dashboard/billing?success=1&planId=${encodeURIComponent(planId)}&interval=${encodeURIComponent(interval)}`,
     });
     return NextResponse.json({ url });
   } catch (err) {

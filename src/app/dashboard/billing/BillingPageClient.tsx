@@ -6,7 +6,9 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PLANS, type PlanId } from "@/lib/billing/plans";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PLANS, isPlanId, type PlanId } from "@/lib/billing/plans";
 import { parseJsonResponse } from "@/lib/parseJsonResponse";
 
 interface UsageData {
@@ -29,6 +31,13 @@ async function loadUsage(): Promise<UsageData | null> {
   return res.ok && data?.plan ? data : null;
 }
 
+function syncFailureMessage(reason?: string, hint?: string): string {
+  if (hint === "email_mismatch" || reason === "no_subscription_for_email") {
+    return "Payment found under a different email. Enter the email used at Lemon Squeezy checkout below and sync again.";
+  }
+  return "Payment received. If your plan does not update, try syncing with your checkout email or refresh in a moment.";
+}
+
 export default function BillingPageClient() {
   const searchParams = useSearchParams();
   const [usage, setUsage] = useState<UsageData | null>(null);
@@ -37,8 +46,37 @@ export default function BillingPageClient() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelMessage, setCancelMessage] = useState<string | null>(null);
+  const [lemonEmail, setLemonEmail] = useState("");
+  const [manualSyncLoading, setManualSyncLoading] = useState(false);
 
   const returningFromCheckout = searchParams.get("success") === "1";
+  const checkoutPlanId = searchParams.get("planId");
+  const preferredPlanId =
+    checkoutPlanId && isPlanId(checkoutPlanId) ? checkoutPlanId : undefined;
+
+  async function runSync(options?: { lemonEmail?: string; planId?: PlanId }) {
+    const syncRes = await fetch("/api/billing/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...(options?.lemonEmail ? { lemonEmail: options.lemonEmail } : {}),
+        ...(options?.planId ? { planId: options.planId } : {}),
+      }),
+    });
+    const syncData = await parseJsonResponse<{
+      synced?: boolean;
+      billing?: UsageData;
+      reason?: string;
+      hint?: string;
+      error?: string;
+    }>(syncRes);
+
+    if (syncRes.ok && syncData?.billing?.plan) {
+      setUsage(syncData.billing);
+    }
+
+    return { syncRes, syncData };
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -48,22 +86,18 @@ export default function BillingPageClient() {
         setSyncing(true);
         setSyncMessage("Activating your subscription…");
         try {
-          const syncRes = await fetch("/api/billing/sync", { method: "POST" });
-          const syncData = await parseJsonResponse<{
-            synced?: boolean;
-            billing?: UsageData;
-            reason?: string;
-          }>(syncRes);
+          const { syncRes, syncData } = await runSync(
+            preferredPlanId ? { planId: preferredPlanId } : undefined
+          );
 
           if (!cancelled && syncRes.ok && syncData?.billing?.plan) {
-            setUsage(syncData.billing);
             if (syncData.synced && syncData.billing.plan !== "free") {
               setSyncMessage(null);
             } else if (!syncData.synced) {
-              setSyncMessage(
-                "Payment received. If your plan does not update, refresh in a moment or check your Lemon Squeezy webhook."
-              );
+              setSyncMessage(syncFailureMessage(syncData.reason, syncData.hint));
             }
+          } else if (!cancelled && !syncRes.ok) {
+            setSyncMessage(syncData?.error ?? "Could not confirm subscription yet. Try again.");
           }
         } catch {
           if (!cancelled) {
@@ -85,7 +119,33 @@ export default function BillingPageClient() {
     return () => {
       cancelled = true;
     };
-  }, [returningFromCheckout]);
+  }, [returningFromCheckout, preferredPlanId]);
+
+  async function handleManualSync() {
+    setManualSyncLoading(true);
+    setSyncMessage(null);
+    try {
+      const { syncRes, syncData } = await runSync(
+        lemonEmail.trim() ? { lemonEmail: lemonEmail.trim() } : undefined
+      );
+
+      if (!syncRes.ok) {
+        setSyncMessage(syncData?.error ?? "Could not sync subscription.");
+        return;
+      }
+
+      if (syncData?.synced && syncData.billing && syncData.billing.plan !== "free") {
+        setSyncMessage(null);
+        return;
+      }
+
+      setSyncMessage(syncFailureMessage(syncData?.reason, syncData?.hint));
+    } catch {
+      setSyncMessage("Could not sync subscription. Please try again.");
+    } finally {
+      setManualSyncLoading(false);
+    }
+  }
 
   async function handleCancel() {
     if (
@@ -213,6 +273,34 @@ export default function BillingPageClient() {
               {cancelMessage}
             </p>
           )}
+
+          <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-4">
+            <div>
+              <p className="text-sm font-medium">Subscription not showing?</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Use the same email at checkout as your Crema account. If you used a different
+                email on Lemon Squeezy, enter it below to link your plan.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lemon-email">Checkout email on Lemon Squeezy</Label>
+              <Input
+                id="lemon-email"
+                type="email"
+                placeholder="email used at checkout"
+                value={lemonEmail}
+                onChange={(e) => setLemonEmail(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="outline"
+              className="rounded-full"
+              disabled={manualSyncLoading}
+              onClick={handleManualSync}
+            >
+              {manualSyncLoading ? "Syncing…" : "Sync subscription"}
+            </Button>
+          </div>
 
           <div className="flex flex-wrap gap-2">
             {plan !== "free" && usage?.hasSubscription && !isCanceled && (

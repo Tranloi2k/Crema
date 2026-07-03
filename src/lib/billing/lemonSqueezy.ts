@@ -19,6 +19,15 @@ export interface LemonSubscription {
   attributes: LemonSubscriptionAttributes;
 }
 
+export interface LemonCustomer {
+  type: string;
+  id: string;
+  attributes: {
+    email: string;
+    name: string;
+  };
+}
+
 interface LemonApiResponse<T> {
   data: T;
 }
@@ -139,6 +148,20 @@ export async function createCheckout(options: {
   return url;
 }
 
+export async function getCustomer(customerId: string): Promise<LemonCustomer> {
+  const response = await lemonFetch<LemonApiResponse<LemonCustomer>>(
+    `/customers/${customerId}`
+  );
+  return response.data;
+}
+
+export async function listCustomersByEmail(email: string): Promise<LemonCustomer[]> {
+  const response = await lemonFetch<LemonApiListResponse<LemonCustomer>>(
+    `/customers?filter[email]=${encodeURIComponent(email)}`
+  );
+  return response.data ?? [];
+}
+
 export async function getSubscription(subscriptionId: string): Promise<LemonSubscription> {
   const response = await lemonFetch<LemonApiResponse<LemonSubscription>>(
     `/subscriptions/${subscriptionId}`
@@ -146,9 +169,16 @@ export async function getSubscription(subscriptionId: string): Promise<LemonSubs
   return response.data;
 }
 
+export async function listSubscriptionsByEmail(email: string): Promise<LemonSubscription[]> {
+  const response = await lemonFetch<LemonApiListResponse<LemonSubscription>>(
+    `/subscriptions?filter[user_email]=${encodeURIComponent(email)}`
+  );
+  return response.data ?? [];
+}
+
 export async function listSubscriptionsByCustomer(customerId: string): Promise<LemonSubscription[]> {
   const response = await lemonFetch<LemonApiListResponse<LemonSubscription>>(
-    `/subscriptions?filter[customer_id]=${encodeURIComponent(customerId)}`
+    `/customers/${encodeURIComponent(customerId)}/subscriptions`
   );
   return response.data ?? [];
 }
