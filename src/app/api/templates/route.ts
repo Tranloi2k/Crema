@@ -71,7 +71,7 @@ export async function POST(req: Request) {
   const defaultName = `Template ${now.toISOString().slice(0, 16).replace("T", " ")}`;
   const presetId = typeof body.preset === "string" ? body.preset : "";
   const preset = presetId ? getPresetTemplate(presetId) : undefined;
-  const content = preset ? preset.build() : createRootBlock();
+  const content = body.root ? normalizeRoot(body.root) : preset ? preset.build() : createRootBlock();
   const requestedName = typeof body.name === "string" && body.name.trim() ? body.name.trim() : "";
   const name = requestedName || preset?.templateName || defaultName;
   const [created] = await db

@@ -7,11 +7,13 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { AuthDivider } from "@/components/auth/AuthDivider";
 import { CredentialsLoginForm } from "@/components/auth/CredentialsLoginForm";
 import { AUTH_ERRORS, OAuthButtons } from "@/components/auth/OAuthButtons";
+import { getSafeAuthCallbackUrl } from "@/lib/auth/callbackUrl";
 
 function LoginForm() {
   const searchParams = useSearchParams();
   const errorCode = searchParams.get("error");
   const errorMessage = errorCode ? AUTH_ERRORS[errorCode] ?? AUTH_ERRORS.Default : null;
+  const callbackUrl = getSafeAuthCallbackUrl(searchParams.get("callbackUrl"));
 
   return (
     <AuthShell
@@ -20,15 +22,18 @@ function LoginForm() {
       footer={
         <>
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-medium text-primary hover:underline">
+          <Link
+            href={`/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+            className="font-medium text-primary hover:underline"
+          >
             Sign up
           </Link>
         </>
       }
     >
-      <CredentialsLoginForm errorMessage={errorMessage} />
+      <CredentialsLoginForm errorMessage={errorMessage} callbackUrl={callbackUrl} />
       <AuthDivider />
-      <OAuthButtons />
+      <OAuthButtons callbackUrl={callbackUrl} />
     </AuthShell>
   );
 }

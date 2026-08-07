@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function CredentialsSignupForm() {
+export function CredentialsSignupForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,7 +53,7 @@ export function CredentialsSignupForm() {
         return;
       }
 
-      window.location.assign("/dashboard");
+      window.location.assign(callbackUrl);
     } catch {
       setError("Could not create account. Please try again.");
     } finally {

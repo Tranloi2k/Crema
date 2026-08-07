@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   DndContext,
   DragOverlay,
@@ -17,8 +18,9 @@ import {
 import { Lock } from "lucide-react";
 
 import { useEditorStore, findBlock } from "@/lib/store/editorStore";
-import { normalizeRoot } from "@/lib/defaultBlocks";
+import { createRootBlock, normalizeRoot } from "@/lib/defaultBlocks";
 import { useAutosave } from "@/lib/hooks/useAutosave";
+import { useGuestDraftAutosave } from "@/lib/hooks/useGuestDraftAutosave";
 import { useEditorShortcuts } from "@/lib/hooks/useEditorShortcuts";
 import { LeftPanel } from "@/components/builder/LeftPanel";
 import { BlockPaletteBar, PaletteDragGhost } from "@/components/builder/BlockPalette";
@@ -31,6 +33,7 @@ import { LoadingOverlay } from "@/components/ui/loader";
 import { resolveDropTarget } from "@/lib/dnd/resolveDrop";
 import { parseJsonResponse } from "@/lib/parseJsonResponse";
 import type { Block, BlockType, StackBlock } from "@/lib/types";
+import { deleteGuestDraft, getGuestDraft, saveGuestDraft } from "@/lib/guestDrafts";
 
 const collisionDetection: CollisionDetection = (args) => {
   const pointerHits = pointerWithin(args);
@@ -50,6 +53,8 @@ function getContainerArray(root: StackBlock, containerId: string): Block[] {
 
 export default function EditorPage() {
   const params = useParams<{ templateId: string }>();
+  const router = useRouter();
+  const { status } = useSession();
   const templateId = params.templateId;
 
   const root = useEditorStore((s) => s.root);
@@ -58,24 +63,70 @@ export default function EditorPage() {
   const addBlock = useEditorStore((s) => s.addBlock);
   const reorderBlocks = useEditorStore((s) => s.reorderBlocks);
   const moveBlock = useEditorStore((s) => s.moveBlock);
+  const name = useEditorStore((s) => s.name);
+  const markSaved = useEditorStore((s) => s.markSaved);
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [paletteDragType, setPaletteDragType] = useState<BlockType | null>(null);
   const [locked, setLocked] = useState(false);
   const [canUpload, setCanUpload] = useState(false);
+  const [isGuestDraft, setIsGuestDraft] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("select");
   const zoom = useEditorStore((s) => s.zoom);
   const setZoom = useEditorStore((s) => s.setZoom);
 
   const readOnly = locked;
 
-  useAutosave(loaded && !readOnly ? templateId : null);
+  useAutosave(
+    loaded && status === "authenticated" && !isGuestDraft && !readOnly ? templateId : null,
+  );
+  const { saveError: guestAutosaveError } = useGuestDraftAutosave(
+    loaded && isGuestDraft && !readOnly ? templateId : null,
+  );
   useEditorShortcuts();
 
+  // Tracks the templateId that has already been fully loaded into the store.
+  // NextAuth's SessionProvider re-syncs `status` across tabs (storage events,
+  // refetch on focus), which would otherwise re-run this effect mid-edit and
+  // reload a guest draft from localStorage, clobbering unsaved keystrokes.
+  // Once a templateId has loaded once, further status toggles are ignored.
+  const loadedTemplateIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    Promise.all([fetch(`/api/templates/${templateId}`), fetch("/api/billing/usage")])
-      .then(async ([templateRes, usageRes]) => {
+    if (status === "loading") return;
+    if (loadedTemplateIdRef.current === templateId) return;
+    let cancelled = false;
+    setLoaded(false);
+
+    async function loadEditor() {
+      const localDraft = getGuestDraft(templateId);
+      if (status === "unauthenticated" || localDraft) {
+        const draft = localDraft ?? {
+          id: templateId,
+          name: "Untitled template",
+          root: createRootBlock(),
+          updatedAt: Date.now(),
+        };
+        if (!localDraft) saveGuestDraft(draft);
+        if (cancelled) return;
+        loadTemplate(draft.id, draft.name, normalizeRoot(draft.root));
+        setIsGuestDraft(true);
+        setLocked(false);
+        setCanUpload(false);
+        setLoaded(true);
+        loadedTemplateIdRef.current = templateId;
+        return;
+      }
+
+      setIsGuestDraft(false);
+      try {
+        const [templateRes, usageRes] = await Promise.all([
+          fetch(`/api/templates/${templateId}`),
+          fetch("/api/billing/usage"),
+        ]);
         const templateData = await parseJsonResponse<{
           id: string;
           name: string;
@@ -86,6 +137,7 @@ export default function EditorPage() {
           limits: { maxImagesPerTemplate: number };
         }>(usageRes);
 
+        if (cancelled) return;
         if (templateData?.id) {
           loadTemplate(templateData.id, templateData.name, normalizeRoot(templateData.content));
           setLocked(!!templateData.locked);
@@ -93,10 +145,58 @@ export default function EditorPage() {
         if (usageData?.limits) {
           setCanUpload(usageData.limits.maxImagesPerTemplate > 0);
         }
-      })
-      .finally(() => setLoaded(true));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateId]);
+        loadedTemplateIdRef.current = templateId;
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    }
+
+    void loadEditor();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadTemplate, status, templateId]);
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      if (isGuestDraft) {
+        const response = await fetch("/api/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, root }),
+        });
+        const data = await parseJsonResponse<{ id: string; error?: string }>(response);
+        if (!response.ok || !data?.id) {
+          setSaveError(data?.error ?? "Could not save this template.");
+          return;
+        }
+        deleteGuestDraft(templateId);
+        markSaved();
+        setIsGuestDraft(false);
+        setLoaded(false);
+        router.replace(`/editor/${data.id}`);
+        return;
+      }
+
+      const response = await fetch(`/api/templates/${templateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, root }),
+      });
+      const data = await parseJsonResponse<{ error?: string }>(response);
+      if (!response.ok) {
+        setSaveError(data?.error ?? "Could not save this template.");
+        return;
+      }
+      markSaved();
+    } catch {
+      setSaveError("Could not save this template. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -149,7 +249,19 @@ export default function EditorPage() {
           This template is locked on your current plan. You can preview and export only.
         </div>
       )}
-      <Toolbar readOnly={readOnly} templateId={templateId} onPreview={() => setPreviewOpen(true)} />
+      <Toolbar
+        readOnly={readOnly}
+        templateId={templateId}
+        isGuestDraft={isGuestDraft}
+        saving={saving}
+        onSave={handleSave}
+        onPreview={() => setPreviewOpen(true)}
+      />
+      {(saveError ?? guestAutosaveError) && (
+        <div role="alert" className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {saveError ?? guestAutosaveError}
+        </div>
+      )}
       {!readOnly && <BlockPaletteBar />}
       <div className="flex flex-1 overflow-hidden">
         {!readOnly && (

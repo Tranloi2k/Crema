@@ -49,7 +49,7 @@ export const AUTH_ERRORS: Record<string, string> = {
   Default: "Sign-in failed. Please try again.",
 };
 
-export function OAuthButtons() {
+export function OAuthButtons({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
   const [providers, setProviders] = useState<Record<string, { id: string }> | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
 
@@ -67,7 +67,7 @@ export function OAuthButtons() {
 
   async function handleSignIn(provider: string) {
     setLoading(provider);
-    await signIn(provider, { callbackUrl: "/dashboard" });
+    await signIn(provider, { callbackUrl });
   }
 
   if (loadingProviders) {

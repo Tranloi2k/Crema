@@ -364,7 +364,7 @@ export function Hero() {
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
           <Button asChild size="lg" className="rounded-pill px-6 shadow-md shadow-primary/30">
-            <Link href={loggedIn ? "/dashboard" : "/signup"}>
+            <Link href="/dashboard">
               {loggedIn ? "Go to dashboard" : "Start building free"}
               <ArrowRight className="ml-1.5 h-4 w-4" />
             </Link>

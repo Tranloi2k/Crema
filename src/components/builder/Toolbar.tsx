@@ -11,7 +11,9 @@ import {
   Eye,
   FileText,
   History,
+  Loader2,
   Redo2,
+  Save,
   Share2,
   Undo2,
 } from "lucide-react";
@@ -29,6 +31,8 @@ import { blocksToPlainText } from "@/lib/export/toPlainText";
 import { HistoryModal } from "@/components/builder/HistoryModal";
 import { ShareModal } from "@/components/builder/ShareModal";
 import { cn } from "@/lib/utils";
+import { RequireAuthDialog } from "@/components/auth/RequireAuthDialog";
+import { useRequireAuth } from "@/lib/hooks/useRequireAuth";
 
 function ToolbarIconButton({
   onClick,
@@ -56,10 +60,12 @@ function ToolbarIconButton({
 
 function ToolbarTextButton({
   onClick,
+  disabled,
   title,
   children,
 }: {
   onClick: () => void;
+  disabled?: boolean;
   title?: string;
   children: ReactNode;
 }) {
@@ -67,8 +73,9 @@ function ToolbarTextButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       title={title}
-      className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+      className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
     >
       {children}
     </button>
@@ -78,10 +85,16 @@ function ToolbarTextButton({
 export function Toolbar({
   readOnly = false,
   templateId,
+  isGuestDraft = false,
+  saving = false,
+  onSave,
   onPreview,
 }: {
   readOnly?: boolean;
   templateId?: string;
+  isGuestDraft?: boolean;
+  saving?: boolean;
+  onSave?: () => void | Promise<void>;
   onPreview?: () => void;
 }) {
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -89,6 +102,7 @@ export function Toolbar({
   const [codeOpen, setCodeOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+  const { requireAuth, authStatus, requestedAction, closeAuthPrompt } = useRequireAuth();
 
   const name = useEditorStore((s) => s.name);
   const setName = useEditorStore((s) => s.setName);
@@ -131,6 +145,14 @@ export function Toolbar({
     downloadFile(blocksToPlainText(root), "text/plain;charset=utf-8", "txt");
   }
 
+  function requestExportHtml() {
+    requireAuth("export", handleExportHtml);
+  }
+
+  function requestExportText() {
+    requireAuth("export", handleExportText);
+  }
+
   return (
     <>
       <div className="flex items-center justify-between gap-4 border-b bg-background px-4 py-2.5">
@@ -171,7 +193,13 @@ export function Toolbar({
               )}
             >
               {!dirty && <Check className="h-3 w-3" />}
-              {dirty ? "Saving…" : "Saved"}
+              {dirty
+                ? isGuestDraft
+                  ? "Saving locally…"
+                  : "Saving…"
+                : isGuestDraft
+                  ? "Saved locally"
+                  : "Saved"}
             </span>
           </div>
         </div>
@@ -193,7 +221,7 @@ export function Toolbar({
               >
                 <Redo2 className="h-4 w-4" />
               </ToolbarIconButton>
-              {templateId && (
+              {templateId && !isGuestDraft && (
                 <ToolbarIconButton
                   onClick={() => setHistoryOpen(true)}
                   title="Version history"
@@ -218,7 +246,7 @@ export function Toolbar({
             </ToolbarTextButton>
           )}
 
-          {templateId && (
+          {templateId && !isGuestDraft && (
             <ToolbarTextButton
               onClick={() => setShareOpen(true)}
               title="Share a read-only preview link"
@@ -228,11 +256,27 @@ export function Toolbar({
             </ToolbarTextButton>
           )}
 
+          {!readOnly && onSave && (
+            <ToolbarTextButton
+              onClick={() => requireAuth("save", onSave)}
+              disabled={saving || authStatus === "loading"}
+              title="Save template"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {saving ? "Saving…" : "Save"}
+            </ToolbarTextButton>
+          )}
+
           <div ref={exportRef} className="relative ml-1">
             <div className="flex items-stretch overflow-hidden rounded-full bg-primary text-primary-foreground shadow-sm">
               <button
                 type="button"
-                onClick={handleExportHtml}
+                onClick={requestExportHtml}
+                disabled={authStatus === "loading"}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium transition-colors hover:bg-primary/90"
               >
                 <Download className="h-4 w-4" />
@@ -259,7 +303,8 @@ export function Toolbar({
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={handleExportHtml}
+                  onClick={requestExportHtml}
+                  disabled={authStatus === "loading"}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-muted"
                 >
                   <Download className="h-4 w-4 text-muted-foreground" />
@@ -268,7 +313,8 @@ export function Toolbar({
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={handleExportText}
+                  onClick={requestExportText}
+                  disabled={authStatus === "loading"}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-muted"
                 >
                   <FileText className="h-4 w-4 text-muted-foreground" />
@@ -294,7 +340,7 @@ export function Toolbar({
         </DialogContent>
       </Dialog>
 
-      {templateId && (
+      {templateId && !isGuestDraft && (
         <>
           <HistoryModal
             templateId={templateId}
@@ -308,6 +354,12 @@ export function Toolbar({
           />
         </>
       )}
+      <RequireAuthDialog
+        action={requestedAction}
+        onOpenChange={(open) => {
+          if (!open) closeAuthPrompt();
+        }}
+      />
     </>
   );
 }

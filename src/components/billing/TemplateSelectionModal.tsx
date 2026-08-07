@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,19 +27,21 @@ interface UsageData {
 }
 
 export function DowngradeSelectionGate() {
+  const { status } = useSession();
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (status !== "authenticated") return;
     fetch("/api/billing/usage")
       .then(async (res) => {
         const data = await parseJsonResponse<UsageData>(res);
         if (res.ok && data?.plan) setUsage(data);
       })
       .catch(() => {});
-  }, []);
+  }, [status]);
 
   const open = !!usage?.downgradeSelectionPending;
   const limits = usage ? getPlanLimits(usage.plan) : null;
