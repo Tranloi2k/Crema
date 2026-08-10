@@ -63,12 +63,15 @@ export async function sendEmailVerificationOtp({
   code: string;
 }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey || apiKey === "re_placeholder") return { ok: false, skipped: true };
+  if (!apiKey || apiKey === "re_placeholder") {
+    console.error("[email-otp] RESEND_API_KEY is not configured");
+    return { ok: false, skipped: true, error: "Email service is not configured" };
+  }
 
   const safeName = escapeHtml(name?.trim() || "there");
   try {
     const { error } = await getResendClient().emails.send({
-      from: process.env.RESEND_FROM_EMAIL ?? "Crema <onboarding@resend.dev>",
+      from: process.env.RESEND_FROM_EMAIL?.trim() || "Crema <no-reply@cremastudio.work>",
       to,
       subject: `${code} is your Crema verification code`,
       html: `
@@ -82,8 +85,18 @@ export async function sendEmailVerificationOtp({
           </div>
         </div>`,
     });
-    return error ? { ok: false, error: error.message } : { ok: true };
+    if (error) {
+      console.error("[email-otp] Resend rejected the verification email", {
+        name: error.name,
+        statusCode: error.statusCode,
+        message: error.message,
+      });
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Email delivery failed" };
+    const message = error instanceof Error ? error.message : "Email delivery failed";
+    console.error("[email-otp] Could not reach Resend", { message });
+    return { ok: false, error: message };
   }
 }
