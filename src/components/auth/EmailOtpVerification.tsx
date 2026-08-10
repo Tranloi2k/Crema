@@ -57,8 +57,12 @@ export function EmailOtpVerification({
         devOtp?: string;
       };
       if (!response.ok) {
-        setError(data.error ?? "Could not send another code.");
         if (typeof data.retryAfter === "number") setRetryAfter(data.retryAfter);
+        if (response.status === 429 && typeof data.retryAfter === "number") {
+          setMessage("A verification code was sent recently. You can use it now or resend when the timer ends.");
+          return;
+        }
+        setError(data.error ?? "Could not send another code.");
         return;
       }
       setDevOtp(data.devOtp);

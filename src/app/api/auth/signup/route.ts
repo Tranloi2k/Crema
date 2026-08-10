@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { hashPassword, isValidEmail, normalizeEmail, validatePassword } from "@/lib/auth/password";
 import {
@@ -28,6 +28,18 @@ function otpResponse({
     ...(deliveryError ? { deliveryError } : {}),
     ...(process.env.NODE_ENV === "development" && code ? { devOtp: code } : {}),
   };
+}
+
+async function discardUndeliveredOtp(userId: string, codeHash: string) {
+  await db
+    .update(users)
+    .set({
+      emailVerificationCodeHash: null,
+      emailVerificationExpiresAt: null,
+      emailVerificationSentAt: null,
+      emailVerificationAttempts: 0,
+    })
+    .where(and(eq(users.id, userId), eq(users.emailVerificationCodeHash, codeHash)));
 }
 
 export async function POST(req: Request) {
@@ -75,11 +87,19 @@ export async function POST(req: Request) {
       .where(eq(users.id, existing.id));
 
     const delivery = await sendEmailVerificationOtp({ to: email, name: existing.name, code: otp.code });
-    const deliveryError = !delivery.ok && !(process.env.NODE_ENV === "development" && delivery.skipped)
+    const usesDevelopmentCode = process.env.NODE_ENV === "development" && delivery.skipped;
+    const deliveryFailed = !delivery.ok && !usesDevelopmentCode;
+    if (deliveryFailed) await discardUndeliveredOtp(existing.id, otp.codeHash);
+    const deliveryError = deliveryFailed
       ? "The verification email could not be sent. Check email configuration, then request a new code."
       : undefined;
     return NextResponse.json(
-      otpResponse({ code: delivery.skipped ? otp.code : undefined, emailSent: delivery.ok, deliveryError }),
+      otpResponse({
+        code: usesDevelopmentCode ? otp.code : undefined,
+        emailSent: delivery.ok,
+        retryAfter: deliveryFailed ? 0 : 60,
+        deliveryError,
+      }),
       { status: 200 },
     );
   }
@@ -101,14 +121,22 @@ export async function POST(req: Request) {
     .returning({ id: users.id, name: users.name, email: users.email });
 
   const delivery = await sendEmailVerificationOtp({ to: email, name, code: otp.code });
-  const deliveryError = !delivery.ok && !(process.env.NODE_ENV === "development" && delivery.skipped)
+  const usesDevelopmentCode = process.env.NODE_ENV === "development" && delivery.skipped;
+  const deliveryFailed = !delivery.ok && !usesDevelopmentCode;
+  if (deliveryFailed) await discardUndeliveredOtp(created.id, otp.codeHash);
+  const deliveryError = deliveryFailed
     ? "The verification email could not be sent. Check email configuration, then request a new code."
     : undefined;
   return NextResponse.json(
     {
       id: created.id,
       email: created.email,
-      ...otpResponse({ code: delivery.skipped ? otp.code : undefined, emailSent: delivery.ok, deliveryError }),
+      ...otpResponse({
+        code: usesDevelopmentCode ? otp.code : undefined,
+        emailSent: delivery.ok,
+        retryAfter: deliveryFailed ? 0 : 60,
+        deliveryError,
+      }),
     },
     { status: 201 },
   );

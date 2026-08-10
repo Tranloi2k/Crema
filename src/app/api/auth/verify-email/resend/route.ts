@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { normalizeEmail, isValidEmail } from "@/lib/auth/password";
 import {
@@ -43,8 +43,19 @@ export async function POST(req: Request) {
 
   const delivery = await sendEmailVerificationOtp({ to: email, name: user.name, code: otp.code });
   if (!delivery.ok && !(process.env.NODE_ENV === "development" && delivery.skipped)) {
+    // Keep the previous code usable when the email provider rejects the new one.
+    // The hash condition prevents an older failed request from overwriting a newer OTP.
+    await db
+      .update(users)
+      .set({
+        emailVerificationCodeHash: user.emailVerificationCodeHash,
+        emailVerificationExpiresAt: user.emailVerificationExpiresAt,
+        emailVerificationSentAt: user.emailVerificationSentAt,
+        emailVerificationAttempts: user.emailVerificationAttempts ?? 0,
+      })
+      .where(and(eq(users.id, user.id), eq(users.emailVerificationCodeHash, otp.codeHash)));
     return NextResponse.json(
-      { error: "Could not send the verification email. Please try again." },
+      { error: "Could not send the verification email. Please try again.", retryAfter: 0 },
       { status: 503 },
     );
   }
