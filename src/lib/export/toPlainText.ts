@@ -1,4 +1,5 @@
 import type { Block, StackBlock } from "@/lib/types";
+import { getSocialItems, SOCIAL_PLATFORMS } from "@/lib/social";
 
 // Decode the small set of HTML entities the editor emits (escapeHtml in toHtml.ts
 // plus &nbsp;) so the plain-text alternative reads naturally.
@@ -65,7 +66,9 @@ function blockToText(block: Block): string {
     case "spacer":
       return "";
     case "social":
-      return block.content.href?.trim() ?? "";
+      return getSocialItems(block.content)
+        .map((item) => `${SOCIAL_PLATFORMS[item.platform].label}: ${item.href.trim()}`)
+        .join("\n");
     case "stack":
       return block.children
         .map(blockToText)

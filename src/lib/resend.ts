@@ -1,5 +1,9 @@
 import { Resend } from "resend";
 
 export function getResendClient() {
-  return new Resend(process.env.RESEND_API_KEY || "re_placeholder");
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("RESEND_API_KEY is not configured");
+  }
+  return new Resend(apiKey);
 }

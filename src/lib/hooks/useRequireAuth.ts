@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useSession } from "next-auth/react";
 
-export type AuthAction = "save" | "export";
+export type AuthAction = "save" | "export" | "send-test";
 
 export function useRequireAuth() {
   const { status } = useSession();

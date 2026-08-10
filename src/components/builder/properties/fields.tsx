@@ -64,7 +64,11 @@ export function Row({
   align?: "center" | "start";
 }) {
   return (
-    <div className={cn("flex gap-2", align === "start" ? "items-start" : "items-center")}>
+    <div
+      role="group"
+      aria-label={label}
+      className={cn("flex gap-2", align === "start" ? "items-start" : "items-center")}
+    >
       <Label
         className={cn(
           "w-[88px] shrink-0 text-xs font-normal text-muted-foreground",
@@ -105,7 +109,7 @@ export function OptionButton({
   className?: string;
 }) {
   return (
-    <button type="button" onClick={onClick} className={optionButtonClass(selected, className)}>
+    <button type="button" onClick={onClick} aria-pressed={selected} className={optionButtonClass(selected, className)}>
       {children}
     </button>
   );
@@ -164,6 +168,8 @@ function ModeToggle({
         type="button"
         onClick={() => onChange(true)}
         title="Uniform"
+        aria-label="Use one value for every side"
+        aria-pressed={linked}
         className={cn(
           "flex h-7 w-7 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
           linked && "bg-muted text-foreground"
@@ -175,6 +181,8 @@ function ModeToggle({
         type="button"
         onClick={() => onChange(false)}
         title="Individual"
+        aria-label="Set each side separately"
+        aria-pressed={!linked}
         className={cn(
           "flex h-7 w-7 items-center justify-center border-l border-input text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
           !linked && "bg-muted text-foreground"
@@ -397,7 +405,7 @@ function SizeValueField({
     }
     const next = Number(raw.replace(/[^\d.-]/g, ""));
     if (!Number.isFinite(next)) return;
-    onChange(next);
+    onChange(Math.max(0, next));
   }
 
   function step(delta: number) {
@@ -726,7 +734,7 @@ export function SidesInput({
   onChange: (s: Sides) => void;
 }) {
   function set(field: keyof Omit<Sides, "linked">, v: number) {
-    onChange({ ...value, [field]: v });
+    onChange({ ...value, [field]: Math.max(0, Number.isFinite(v) ? v : 0) });
   }
 
   function setLinked(linked: boolean) {
@@ -743,8 +751,9 @@ export function SidesInput({
         {value.linked ? (
           <Input
             type="number"
+            min={0}
             value={value.top}
-            onChange={(e) => onChange(makeSides(Number(e.target.value), true))}
+            onChange={(e) => onChange(makeSides(Math.max(0, Number(e.target.value) || 0), true))}
             className="h-7 flex-1 text-xs"
           />
         ) : (
@@ -761,6 +770,7 @@ export function SidesInput({
             { key: "left", label: "L", value: value.left },
           ]}
           onChange={(key, v) => set(key as keyof Omit<Sides, "linked">, v)}
+          min={0}
         />
       )}
     </div>

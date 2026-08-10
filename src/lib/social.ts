@@ -18,6 +18,14 @@ export interface SocialItem {
   href: string;
 }
 
+export type SocialContent = {
+  /** Current format: one Social block owns the complete icon group. */
+  items?: SocialItem[];
+  /** Legacy single-icon fields kept readable for previously saved templates. */
+  platform?: SocialPlatform;
+  href?: string;
+};
+
 export const SOCIAL_PLATFORMS: Record<
   SocialPlatform,
   { label: string; icon: string; defaultHref: string }
@@ -32,6 +40,17 @@ export const SOCIAL_PLATFORMS: Record<
 };
 
 export const SOCIAL_PLATFORM_LIST = Object.keys(SOCIAL_PLATFORMS) as SocialPlatform[];
+
+export function getSocialItems(content: SocialContent): SocialItem[] {
+  if (content.items?.length) return content.items;
+  if (content.platform) {
+    return [{
+      platform: content.platform,
+      href: content.href ?? SOCIAL_PLATFORMS[content.platform].defaultHref,
+    }];
+  }
+  return [];
+}
 
 /**
  * Iconify CDN URL for a platform's icon, tinted with `hexColor` and rendered at

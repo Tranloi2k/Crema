@@ -1,6 +1,6 @@
 "use client";
 
-import { useDroppable } from "@dnd-kit/core";
+import { useDndContext, useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import type { FlexAlign, FlexJustify, StackBlock as StackBlockType, Block } from "@/lib/types";
 import { toDimension, dim, dimToCss, toSides, sidesToCss } from "@/lib/types";
@@ -26,11 +26,13 @@ import { cn } from "@/lib/utils";
 // without the outer padding/commonStyle wrapper — shared by nested Stacks
 // (via StackBlock below) and the canvas's root Stack (via Canvas.tsx), so
 // both render their children identically.
-export function StackChildren({ block }: { block: StackBlockType }) {
+export function StackChildren({ block, isRoot = false }: { block: StackBlockType; isRoot?: boolean }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `stack-drop-${block.id}`,
     data: { containerId: block.id },
   });
+  const { active } = useDndContext();
+  const isAddingBlock = active?.data.current?.source === "palette";
 
   const isRow = block.style.direction === "row";
   const width = toDimension(block.style.width, dim(0, "fit-content"));
@@ -75,12 +77,13 @@ export function StackChildren({ block }: { block: StackBlockType }) {
           : {}),
       }}
       className={cn(
-        "w-full min-w-0 rounded border border-dashed border-muted-foreground/30",
-        isEmpty && "min-h-[48px]",
+        "relative w-full min-w-0 rounded-lg border border-dashed border-muted-foreground/30 transition-[border-color,background-color,box-shadow] duration-150",
+        isEmpty && (isRoot ? "min-h-[280px]" : "min-h-[72px]"),
         !fitHeight && "self-stretch",
         (columnHeightLayout || rowHeightLayout) && "flex-1",
         rowWidthLayout && "w-full",
-        isOver && "border-primary ring-2 ring-primary/40"
+        isAddingBlock && !isOver && "border-primary/45 bg-primary/[0.025]",
+        isOver && "border-primary bg-primary/[0.06] ring-2 ring-primary/35 ring-offset-2"
       )}
     >
       <SortableContext
@@ -88,8 +91,13 @@ export function StackChildren({ block }: { block: StackBlockType }) {
         strategy={isRow ? horizontalListSortingStrategy : verticalListSortingStrategy}
       >
         {block.children.length === 0 ? (
-          <div className="flex min-h-[48px] w-full flex-1 items-center justify-center p-4 text-xs text-muted-foreground">
-            Drop blocks here
+          <div className={cn("flex w-full flex-1 flex-col items-center justify-center p-4 text-center", isRoot ? "min-h-[280px]" : "min-h-[72px]")}>
+            <span className={cn("text-sm font-semibold", isOver ? "text-primary" : "text-foreground")}>
+              {isOver ? "Release to add it here" : isRoot ? "Start building your email" : "Add content to this layout"}
+            </span>
+            <span className="mt-1 max-w-64 text-xs leading-5 text-muted-foreground">
+              {isAddingBlock ? "Move over this area and release." : isRoot ? "Choose a ready-made section or drag a block from the left panel." : "Drag a block here or select one from the Blocks panel."}
+            </span>
           </div>
         ) : (
           block.children.map((child, index) => (
@@ -119,6 +127,13 @@ export function StackChildren({ block }: { block: StackBlockType }) {
           ))
         )}
       </SortableContext>
+      {isOver && !isEmpty && (
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-lg border-2 border-primary bg-primary/5">
+          <span className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full bg-primary px-2.5 py-1 text-[10px] font-semibold text-primary-foreground shadow-sm">
+            Release to add here
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -34,7 +34,7 @@ export function MergeTagInsertMenu({
       )}
       title={`Insert ${provider.name} variable`}
     >
-      <option value="">Variable</option>
+      <option value="">Personalized field</option>
       {provider.variables.map((v) => (
         <option key={v.id} value={v.id}>
           {v.label}
@@ -68,7 +68,10 @@ export function VariablesPanel() {
         <p className="text-[10px] leading-relaxed text-muted-foreground">{provider.description}</p>
       </div>
 
-      <p className="mb-2 text-xs font-medium text-foreground">Variables</p>
+      <p className="mb-1 text-xs font-medium text-foreground">Personalized fields</p>
+      <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
+        Insert details such as a subscriber&apos;s name. Your email platform fills them in when sending.
+      </p>
       <ul className="flex flex-col gap-1">
         {provider.variables.map((variable) => {
           const tag = provider.format(variable.id);
@@ -93,7 +96,7 @@ export function VariablesPanel() {
       </ul>
 
       <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground">
-        Click a variable to insert it into the selected text block, or use the Variable button in
+        Click a field to insert it into the selected text block, or use the personalized-field button in
         properties. Exported HTML keeps the raw syntax for your ESP.
       </p>
     </div>

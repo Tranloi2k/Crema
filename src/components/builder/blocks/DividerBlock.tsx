@@ -8,7 +8,7 @@ export function DividerBlock({ block }: { block: DividerBlockType }) {
       <hr
         style={{
           border: "none",
-          borderTop: `${block.style.thickness}px solid ${block.style.color}`,
+          borderTop: `${block.style.thickness}px ${block.style.lineStyle ?? "solid"} ${block.style.color}`,
           margin: 0,
         }}
       />

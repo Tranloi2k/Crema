@@ -7,6 +7,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  KeyboardSensor,
   closestCorners,
   pointerWithin,
   useSensor,
@@ -15,7 +16,8 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Lock } from "lucide-react";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { Blocks, Lock, SlidersHorizontal, X } from "lucide-react";
 
 import { useEditorStore, findBlock } from "@/lib/store/editorStore";
 import { createRootBlock, normalizeRoot } from "@/lib/defaultBlocks";
@@ -23,17 +25,21 @@ import { useAutosave } from "@/lib/hooks/useAutosave";
 import { useGuestDraftAutosave } from "@/lib/hooks/useGuestDraftAutosave";
 import { useEditorShortcuts } from "@/lib/hooks/useEditorShortcuts";
 import { LeftPanel } from "@/components/builder/LeftPanel";
-import { BlockPaletteBar, PaletteDragGhost } from "@/components/builder/BlockPalette";
+import { PaletteDragGhost } from "@/components/builder/BlockPalette";
 import { Canvas } from "@/components/builder/Canvas";
 import { PropertiesPanel } from "@/components/builder/PropertiesPanel";
 import { Toolbar } from "@/components/builder/Toolbar";
 import { PreviewModal } from "@/components/builder/PreviewModal";
+import { EditorOnboarding } from "@/components/builder/EditorOnboarding";
+import { EditorChecklist } from "@/components/builder/EditorChecklist";
 import { ZoomToolbar, type Tool } from "@/components/builder/ZoomToolbar";
+import { Button } from "@/components/ui/button";
 import { LoadingOverlay } from "@/components/ui/loader";
 import { resolveDropTarget } from "@/lib/dnd/resolveDrop";
 import { parseJsonResponse } from "@/lib/parseJsonResponse";
 import type { Block, BlockType, StackBlock } from "@/lib/types";
 import { deleteGuestDraft, getGuestDraft, saveGuestDraft } from "@/lib/guestDrafts";
+import { cn } from "@/lib/utils";
 
 const collisionDetection: CollisionDetection = (args) => {
   const pointerHits = pointerWithin(args);
@@ -65,6 +71,7 @@ export default function EditorPage() {
   const moveBlock = useEditorStore((s) => s.moveBlock);
   const name = useEditorStore((s) => s.name);
   const markSaved = useEditorStore((s) => s.markSaved);
+  const dirty = useEditorStore((s) => s.dirty);
 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -75,10 +82,21 @@ export default function EditorPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("select");
+  const [hasPreviewed, setHasPreviewed] = useState(false);
+  const [hasSentTest, setHasSentTest] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"build" | "properties" | null>(null);
+  const [propertiesHint, setPropertiesHint] = useState(false);
+  const propertiesHintTimerRef = useRef<number | null>(null);
   const zoom = useEditorStore((s) => s.zoom);
   const setZoom = useEditorStore((s) => s.setZoom);
 
   const readOnly = locked;
+
+  useEffect(() => {
+    return () => {
+      if (propertiesHintTimerRef.current) window.clearTimeout(propertiesHintTimerRef.current);
+    };
+  }, []);
 
   useAutosave(
     loaded && status === "authenticated" && !isGuestDraft && !readOnly ? templateId : null,
@@ -198,7 +216,10 @@ export default function EditorPage() {
     }
   }
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current as
@@ -222,6 +243,7 @@ export default function EditorPage() {
 
     if (activeData?.source === "palette" && activeData.blockType) {
       addBlock(activeData.blockType, containerId, index);
+      focusNewBlockProperties();
       return;
     }
 
@@ -237,12 +259,24 @@ export default function EditorPage() {
 
   const selectedBlock = selectedBlockId ? findBlock(root, selectedBlockId) : null;
 
+  function openPreview() {
+    setHasPreviewed(true);
+    setPreviewOpen(true);
+  }
+
+  function focusNewBlockProperties() {
+    setPropertiesHint(true);
+    if (propertiesHintTimerRef.current) window.clearTimeout(propertiesHintTimerRef.current);
+    propertiesHintTimerRef.current = window.setTimeout(() => setPropertiesHint(false), 1600);
+    if (window.innerWidth < 1280) setMobilePanel("properties");
+  }
+
   if (!loaded) {
     return <LoadingOverlay label="Loading template..." />;
   }
 
   const editorBody = (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh min-w-0 flex-col bg-background">
       {readOnly && (
         <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-900 dark:text-amber-200">
           <Lock className="h-4 w-4 shrink-0" />
@@ -255,28 +289,46 @@ export default function EditorPage() {
         isGuestDraft={isGuestDraft}
         saving={saving}
         onSave={handleSave}
-        onPreview={() => setPreviewOpen(true)}
+        onPreview={openPreview}
+        onTestSent={() => setHasSentTest(true)}
       />
       {(saveError ?? guestAutosaveError) && (
         <div role="alert" className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {saveError ?? guestAutosaveError}
         </div>
       )}
-      {!readOnly && <BlockPaletteBar />}
+      {!readOnly && (
+        <EditorChecklist
+          hasContent={root.children.length > 0}
+          hasPreviewed={hasPreviewed}
+          hasSentTest={hasSentTest}
+          isSaved={!dirty}
+        />
+      )}
+      {!readOnly && (
+        <div className="flex h-11 shrink-0 items-center justify-end gap-2 border-b bg-background px-3 xl:hidden">
+          <Button data-tour="add-content" type="button" variant="outline" size="sm" className="h-8 flex-1 gap-2 lg:hidden" onClick={() => setMobilePanel("build")}>
+            <Blocks className="h-4 w-4" /> Add content
+          </Button>
+          <Button data-tour="properties" type="button" variant="outline" size="sm" className="h-8 flex-1 gap-2 lg:max-w-56" disabled={!selectedBlock} onClick={() => setMobilePanel("properties")}>
+            <SlidersHorizontal className="h-4 w-4" /> Edit selection
+          </Button>
+        </div>
+      )}
       <div className="flex flex-1 overflow-hidden">
         {!readOnly && (
-          <aside className="flex w-64 flex-col overflow-hidden border-r bg-muted/30">
-            <LeftPanel />
+          <aside className="hidden w-72 shrink-0 flex-col overflow-hidden border-r bg-background shadow-[1px_0_0_hsl(var(--border))] lg:flex">
+            <LeftPanel onBlockAdded={focusNewBlockProperties} />
           </aside>
         )}
-        <main className="relative flex flex-1 flex-col overflow-hidden bg-muted/60">
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-muted/50">
           <div className="relative flex-1 overflow-hidden">
-            <Canvas root={root} zoom={zoom} tool={tool} />
+            <Canvas root={root} zoom={zoom} tool={tool} onInitialFit={setZoom} />
             <ZoomToolbar tool={tool} onToolChange={setTool} zoom={zoom} onZoomChange={setZoom} />
           </div>
         </main>
         {!readOnly ? (
-          <aside className="w-80 overflow-y-auto border-l bg-muted/30">
+          <aside className={cn("hidden w-80 shrink-0 overflow-y-auto border-l bg-background shadow-[-1px_0_0_hsl(var(--border))] transition-shadow xl:block", propertiesHint && "ring-2 ring-inset ring-primary/40 shadow-[-8px_0_24px_-12px_hsl(var(--primary))]")}>
             <PropertiesPanel
               block={selectedBlock}
               templateId={templateId}
@@ -289,6 +341,27 @@ export default function EditorPage() {
           </aside>
         )}
       </div>
+
+      {!readOnly && mobilePanel && (
+        <div className="fixed inset-0 z-50 xl:hidden">
+          <button type="button" aria-label="Close panel" className="absolute inset-0 bg-black/35 backdrop-blur-[1px]" onClick={() => setMobilePanel(null)} />
+          <aside className={cn("absolute inset-y-0 flex w-[min(88vw,22rem)] flex-col overflow-hidden bg-background shadow-2xl", mobilePanel === "build" ? "left-0" : "right-0")}>
+            <div className="flex h-12 shrink-0 items-center justify-between border-b px-3">
+              <span className="text-sm font-semibold">{mobilePanel === "build" ? "Add content" : "Edit selection"}</span>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMobilePanel(null)} aria-label="Close panel">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {mobilePanel === "build" ? (
+                <LeftPanel onBlockAdded={focusNewBlockProperties} />
+              ) : (
+                <PropertiesPanel block={selectedBlock} templateId={templateId} canUpload={canUpload} />
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 
@@ -311,6 +384,7 @@ export default function EditorPage() {
         </DndContext>
       )}
       <PreviewModal root={root} open={previewOpen} onOpenChange={setPreviewOpen} />
+      {!readOnly && <EditorOnboarding />}
     </>
   );
 }

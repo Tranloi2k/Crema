@@ -1,3 +1,7 @@
+"use client";
+
+import { ImageOff } from "lucide-react";
+import { useState } from "react";
 import type { ImageBlock as ImageBlockType } from "@/lib/types";
 import { toDimension, dim, toSides, sidesToCss } from "@/lib/types";
 import { isFillWidth, isPercentWidth } from "@/lib/layout/dimensions";
@@ -11,6 +15,7 @@ export function ImageBlock({
   block: ImageBlockType;
   compactWidth?: boolean;
 }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const width = toDimension(block.style.width, dim(560));
   const height = toDimension(block.style.height, dim(0, "fit-content"));
   const hugWidth =
@@ -25,13 +30,26 @@ export function ImageBlock({
         ...commonStyleToReactStyle(block.style),
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={block.content.src}
-        alt={block.content.alt}
-        style={imageToReactStyle(width, height, block.style.align)}
-        data-resize-target={block.id}
-      />
+      {!block.content.src.trim() || failedSrc === block.content.src ? (
+        <div
+          className="flex min-h-28 w-full flex-col items-center justify-center rounded-lg border border-dashed bg-muted/40 px-4 text-center text-muted-foreground"
+          style={imageToReactStyle(width, height, block.style.align)}
+          data-resize-target={block.id}
+        >
+          <ImageOff className="mb-2 h-5 w-5" />
+          <span className="text-xs font-medium">Image unavailable</span>
+          <span className="mt-1 text-[10px]">Choose a file or check the image URL.</span>
+        </div>
+      ) : (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={block.content.src}
+          alt={block.content.alt}
+          style={imageToReactStyle(width, height, block.style.align)}
+          data-resize-target={block.id}
+          onError={() => setFailedSrc(block.content.src)}
+        />
+      )}
     </div>
   );
 }

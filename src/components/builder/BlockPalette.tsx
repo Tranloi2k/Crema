@@ -1,51 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import {
-  Type,
   ImageIcon,
-  RectangleHorizontal,
   Minus,
   MoveVertical,
+  RectangleHorizontal,
   Rows3,
+  Search,
   Share2,
-  Send,
+  Type,
 } from "lucide-react";
 import type { BlockType } from "@/lib/types";
 import { useEditorStore } from "@/lib/store/editorStore";
-import { blocksToHtml } from "@/lib/export/toHtml";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const PALETTE_ITEMS: {
   type: BlockType;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
+  category: string;
+  description: string;
 }[] = [
-  { type: "text", label: "Text", icon: Type },
-  { type: "image", label: "Image", icon: ImageIcon },
-  { type: "button", label: "Button", icon: RectangleHorizontal },
-  { type: "divider", label: "Divider", icon: Minus },
-  { type: "spacer", label: "Spacer", icon: MoveVertical },
-  { type: "stack", label: "Stack", icon: Rows3 },
-  { type: "social", label: "Social", icon: Share2 },
+  { type: "text", label: "Text", icon: Type, category: "Content", description: "Heading or paragraph" },
+  { type: "image", label: "Image", icon: ImageIcon, category: "Content", description: "Photo or graphic" },
+  { type: "social", label: "Social links", icon: Share2, category: "Content", description: "A group of social icons" },
+  { type: "button", label: "Button", icon: RectangleHorizontal, category: "Actions", description: "Call-to-action link" },
+  { type: "divider", label: "Divider", icon: Minus, category: "Structure", description: "Separate sections" },
+  { type: "spacer", label: "Spacer", icon: MoveVertical, category: "Structure", description: "Add breathing room" },
+  { type: "stack", label: "Layout", icon: Rows3, category: "Structure", description: "Arrange content vertically or side-by-side" },
 ];
 
 const PALETTE_META = Object.fromEntries(
   PALETTE_ITEMS.map((item) => [item.type, item]),
 ) as Record<BlockType, (typeof PALETTE_ITEMS)[number]>;
 
-/** Floating chip rendered inside the DndContext DragOverlay while a palette
- *  block is being dragged onto the canvas. */
 export function PaletteDragGhost({ type }: { type: BlockType }) {
   const meta = PALETTE_META[type];
   if (!meta) return null;
   const Icon = meta.icon;
   return (
-    <div className="pointer-events-none flex items-center gap-1.5 rounded-lg border border-primary bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-lg">
-      <Icon className="h-4 w-4" />
+    <div className="pointer-events-none flex items-center gap-2 rounded-xl border border-primary bg-card px-3 py-2 text-xs font-medium text-foreground shadow-xl">
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="h-4 w-4" />
+      </span>
       {meta.label}
     </div>
   );
@@ -55,13 +55,9 @@ function PaletteItem({
   type,
   label,
   icon: Icon,
-  orientation,
-}: {
-  type: BlockType;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  orientation: "grid" | "bar";
-}) {
+  description,
+  onBlockAdded,
+}: (typeof PALETTE_ITEMS)[number] & { onBlockAdded?: () => void }) {
   const addBlock = useEditorStore((s) => s.addBlock);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `palette-${type}`,
@@ -73,83 +69,95 @@ function PaletteItem({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      onClick={() => addBlock(type)}
+      type="button"
+      onClick={() => {
+        addBlock(type);
+        onBlockAdded?.();
+      }}
+      title={`Add ${label.toLowerCase()} block`}
       className={cn(
-        "flex items-center font-medium border border-input bg-card text-xs shadow-sm transition-colors",
-        "hover:border-primary/60 hover:bg-muted hover:shadow-md",
-        "active:border-primary active:bg-primary/15 active:shadow-sm",
+        "group flex min-h-[4.5rem] w-full items-center gap-3 rounded-xl border border-border/80 bg-card p-3 text-left shadow-sm transition-all",
+        "hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/[0.03] hover:shadow-md",
+        "active:translate-y-0 active:border-primary active:bg-primary/10 active:shadow-sm",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        orientation === "grid"
-          ? "flex-col justify-center gap-1.5 rounded-xl p-3"
-          : "shrink-0 gap-1.5 rounded-lg px-3 py-1.5",
-        isDragging && "opacity-50",
+        isDragging && "opacity-40",
       )}
     >
-      <Icon className={orientation === "grid" ? "h-5 w-5" : "h-4 w-4"} />
-      {label}
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+        <Icon className="h-[18px] w-[18px]" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs font-semibold text-foreground">{label}</span>
+        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+          {description}
+        </span>
+      </span>
     </button>
   );
 }
 
-export function BlockPalette() {
-  return (
-    <div className="grid grid-cols-2 gap-2 p-3">
-      {PALETTE_ITEMS.map((item) => (
-        <PaletteItem key={item.type} orientation="grid" {...item} />
-      ))}
-    </div>
+export function BlockPalette({ onBlockAdded }: { onBlockAdded?: () => void }) {
+  const [filter, setFilter] = useState("");
+  const normalizedFilter = filter.trim().toLowerCase();
+
+  const groups = PALETTE_ITEMS.reduce<Record<string, typeof PALETTE_ITEMS>>(
+    (acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    },
+    {},
   );
-}
 
-/** Horizontal block palette — full-width bar above the editor columns. */
-export function BlockPaletteBar() {
-  const name = useEditorStore((s) => s.name);
-  const root = useEditorStore((s) => s.root);
-  const [sending, setSending] = useState(false);
-  const [testEmail, setTestEmail] = useState("");
-
-  async function handleSendTest() {
-    if (!testEmail) return;
-    setSending(true);
-    try {
-      await fetch("/api/send-test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: testEmail,
-          html: blocksToHtml(root),
-          subject: name,
-        }),
-      });
-    } finally {
-      setSending(false);
-    }
-  }
+  const hasResults = PALETTE_ITEMS.some(
+    (item) =>
+      item.label.toLowerCase().includes(normalizedFilter) ||
+      item.description.toLowerCase().includes(normalizedFilter),
+  );
 
   return (
-    <div className="flex items-center justify-between gap-4 overflow-x-auto border-b border-border/60 bg-background px-4 py-2">
-      <div className="flex items-center gap-2">
-        {PALETTE_ITEMS.map((item) => (
-          <PaletteItem key={item.type} orientation="bar" {...item} />
-        ))}
+    <div className="p-3">
+      <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Add one block at a time
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="relative mb-4">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="test@email.com"
-          value={testEmail}
-          onChange={(e) => setTestEmail(e.target.value)}
-          className="h-8 w-44 rounded-full"
+          placeholder="Search blocks..."
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          className="h-9 w-full bg-muted/40 pl-8 text-xs"
+          aria-label="Search blocks"
         />
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full"
-          onClick={handleSendTest}
-          disabled={sending}
-        >
-          <Send className="mr-1.5 h-4 w-4" /> Send test
-        </Button>
       </div>
+
+      {!hasResults && (
+        <div className="rounded-xl border border-dashed p-5 text-center">
+          <p className="text-xs font-medium text-foreground">No blocks found</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Try a different search.</p>
+        </div>
+      )}
+
+      {Object.entries(groups).map(([category, items]) => {
+        const visible = items.filter(
+          (item) =>
+            item.label.toLowerCase().includes(normalizedFilter) ||
+            item.description.toLowerCase().includes(normalizedFilter),
+        );
+        if (visible.length === 0) return null;
+        return (
+          <section key={category} className="mb-5 last:mb-1">
+            <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {category}
+            </h3>
+            <div className="grid gap-2">
+              {visible.map((item) => (
+                <PaletteItem key={item.type} {...item} onBlockAdded={onBlockAdded} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

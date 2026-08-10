@@ -1,6 +1,6 @@
 import type { Block, CommonStyle, FlexAlign, FlexJustify, StackBlock } from "@/lib/types";
 import { toDimension, dim, dimToCss, toSides, sidesToCss } from "@/lib/types";
-import { socialIconUrl, SOCIAL_PLATFORMS } from "@/lib/social";
+import { getSocialItems, socialIconUrl, SOCIAL_PLATFORMS } from "@/lib/social";
 import { isDistributedJustify } from "@/lib/layout/flexAlign";
 import { childFillsStackCrossAxis, childFillsStackMainAxis, isFillHeight, rowShouldStackOnMobile, stackHasFillMainChild } from "@/lib/layout/dimensions";
 import { commonStyleToCssString, commonContainerTableCss } from "@/lib/export/commonStyle";
@@ -345,25 +345,33 @@ function renderBlockCell(block: Block, ctx: RenderContext = {}): string {
     case "divider":
       return `<td style="padding:${pad(block.style)};${commonSuffix(block.style)}">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-          <tr><td style="border-top:${block.style.thickness}px solid ${block.style.color};font-size:0;line-height:0;">&nbsp;</td></tr>
+          <tr><td style="border-top:${block.style.thickness}px ${block.style.lineStyle ?? "solid"} ${block.style.color};font-size:0;line-height:0;">&nbsp;</td></tr>
         </table>
       </td>`;
     case "social": {
+      const items = getSocialItems(block.content);
       const width = toDimension(block.style.width, dim(32));
       const height = toDimension(block.style.height, dim(32));
       const { widthAttr, heightAttr, style: imgStyle } = imageToHtmlAttrs(width, height);
       const size = Math.round(
         Math.max(width.unit === "px" ? width.value : 0, height.unit === "px" ? height.value : 0) * 2
       );
-      const url = socialIconUrl(block.content.platform, block.style.iconColor, size || 64);
-      const label = SOCIAL_PLATFORMS[block.content.platform]?.label ?? block.content.platform;
-      const href = block.content.href ? escapeHtml(block.content.href) : "#";
-      const rowCellWidth = imageRowCellWidthCss(width, !!ctx.inRowStack);
-      const rowCellWidthAttr = imageRowCellWidthAttr(width, !!ctx.inRowStack);
-      const img = `<img src="${escapeHtml(url)}" alt="${escapeHtml(
-        label
-      )}"${widthAttr}${heightAttr} style="${imgStyle}" />`;
-      return `<td${rowCellWidthAttr} style="padding:${pad(block.style)};${rowCellWidth}text-align:${block.style.align};${commonSuffix(block.style)}"><a href="${href}" target="_blank">${img}</a></td>`;
+      const gap = Math.max(0, block.style.gap ?? 8);
+      const groupWidth = width.unit === "px"
+        ? dim(width.value * items.length + gap * Math.max(0, items.length - 1))
+        : width;
+      const rowCellWidth = imageRowCellWidthCss(groupWidth, !!ctx.inRowStack);
+      const rowCellWidthAttr = imageRowCellWidthAttr(groupWidth, !!ctx.inRowStack);
+      const cells = items.map((item, index) => {
+        const url = socialIconUrl(item.platform, block.style.iconColor, size || 64);
+        const label = SOCIAL_PLATFORMS[item.platform]?.label ?? item.platform;
+        const href = item.href ? escapeHtml(item.href) : "#";
+        const gapStyle = index > 0 ? `padding-left:${gap}px;` : "";
+        const img = `<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}"${widthAttr}${heightAttr} style="${imgStyle}" />`;
+        return `<td style="${gapStyle}font-size:0;line-height:0;"><a href="${href}" target="_blank">${img}</a></td>`;
+      }).join("");
+      const align = block.style.align === "left" ? "left" : block.style.align === "right" ? "right" : "center";
+      return `<td${rowCellWidthAttr} style="padding:${pad(block.style)};${rowCellWidth}text-align:${align};${commonSuffix(block.style)}"><table role="presentation" align="${align}" cellpadding="0" cellspacing="0" border="0"><tr>${cells}</tr></table></td>`;
     }
     case "spacer": {
       const height = toDimension(block.style.height, dim(24));

@@ -183,6 +183,7 @@ interface EditorState {
   registerTextEditor: (api: TextEditorApi | null) => void;
   insertMergeTag: (tag: string) => void;
   addBlock: (type: BlockType, parentId?: string | null, index?: number) => void;
+  addSection: (section: StackBlock) => void;
   removeBlock: (id: string) => void;
   removeBlocks: (ids: string[]) => void;
   wrapInStack: (ids: string[]) => void;
@@ -311,6 +312,15 @@ export const useEditorStore = create<EditorState>((set) => ({
         dirty: true,
       };
     }),
+
+  addSection: (section) =>
+    set((state) => ({
+      ...history(state),
+      root: { ...state.root, children: [...state.root.children, section] },
+      selectedBlockId: section.id,
+      selectedBlockIds: [section.id],
+      dirty: true,
+    })),
 
   removeBlock: (id) =>
     set((state) => {

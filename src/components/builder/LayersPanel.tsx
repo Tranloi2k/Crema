@@ -24,7 +24,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { Block, StackBlock } from "@/lib/types";
-import { SOCIAL_PLATFORMS } from "@/lib/social";
+import { getSocialItems } from "@/lib/social";
 import { useEditorStore, findBlock } from "@/lib/store/editorStore";
 import { useDropIndicator } from "@/lib/hooks/useDropIndicator";
 import { resolveDropTarget } from "@/lib/dnd/resolveDrop";
@@ -66,9 +66,9 @@ function labelFor(block: Block): string {
     case "spacer":
       return "Spacer";
     case "stack":
-      return "Stack";
+      return "Layout";
     case "social":
-      return SOCIAL_PLATFORMS[block.content.platform]?.label ?? "Social";
+      return `Social links (${getSocialItems(block.content).length})`;
   }
 }
 

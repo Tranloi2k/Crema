@@ -21,18 +21,18 @@ export interface BaseBlock {
 
 export type Unit = "px" | "%" | "fit-content" | "fill";
 export const UNIT_OPTIONS: { label: string; value: Unit }[] = [
-  { label: "px", value: "px" },
-  { label: "%", value: "%" },
-  { label: "Fit content", value: "fit-content" },
-  { label: "Fill", value: "fill" },
+  { label: "Pixels", value: "px" },
+  { label: "Percent", value: "%" },
+  { label: "Auto (content)", value: "fit-content" },
+  { label: "Fill container", value: "fill" },
 ];
 
 /** Framer-style labels for height (and width) size fields. */
 export const SIZE_UNIT_OPTIONS: { label: string; shortLabel?: string; value: Unit }[] = [
-  { label: "Fixed", value: "px" },
-  { label: "Relative", shortLabel: "Rel", value: "%" },
-  { label: "Fill", value: "fill" },
-  { label: "Fit", value: "fit-content" },
+  { label: "Fixed size", shortLabel: "Fixed", value: "px" },
+  { label: "Percent of container", shortLabel: "%", value: "%" },
+  { label: "Fill available space", shortLabel: "Fill", value: "fill" },
+  { label: "Auto (fit content)", shortLabel: "Auto", value: "fit-content" },
 ];
 
 export interface Dimension {
@@ -284,7 +284,7 @@ export interface ButtonBlock extends BaseBlock {
 export interface DividerBlock extends BaseBlock {
   type: "divider";
   content: Record<string, never>;
-  style: { color: string; thickness: number; padding: number | Sides } & CommonStyle;
+  style: { color: string; thickness: number; lineStyle?: "solid" | "dashed" | "dotted"; padding: number | Sides } & CommonStyle;
 }
 
 export interface SpacerBlock extends BaseBlock {
@@ -310,13 +310,14 @@ export interface StackBlock extends BaseBlock {
 
 export interface SocialBlock extends BaseBlock {
   type: "social";
-  content: { platform: import("@/lib/social").SocialPlatform; href: string };
+  content: import("@/lib/social").SocialContent;
   style: {
     align: "left" | "center" | "right";
     iconColor: string;
     width: number | Dimension;
     height: number | Dimension;
     padding: number | Sides;
+    gap?: number;
   } & CommonStyle;
 }
 

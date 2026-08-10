@@ -3,7 +3,7 @@ import { toDimension, dim, toSides, sidesToCss } from "@/lib/types";
 import { isFillWidth, isPercentWidth } from "@/lib/layout/dimensions";
 import { commonStyleToReactStyle } from "@/lib/export/commonStyle";
 import { imageToReactStyle } from "@/lib/export/imageStyle";
-import { socialIconUrl, SOCIAL_PLATFORMS } from "@/lib/social";
+import { getSocialItems, socialIconUrl, SOCIAL_PLATFORMS } from "@/lib/social";
 
 function urlSize(w: number, h: number): number {
   const px = Math.max(w, h);
@@ -20,29 +20,43 @@ export function SocialBlock({
   const width = toDimension(block.style.width, dim(32));
   const height = toDimension(block.style.height, dim(32));
   const hugWidth = compactWidth || (!isFillWidth(width) && !isPercentWidth(width));
-  const label = SOCIAL_PLATFORMS[block.content.platform]?.label ?? block.content.platform;
-  const src = socialIconUrl(
-    block.content.platform,
-    block.style.iconColor,
-    urlSize(width.unit === "px" ? width.value : 0, height.unit === "px" ? height.value : 0)
-  );
+  const items = getSocialItems(block.content);
+  const groupAlign =
+    block.style.align === "center"
+      ? { marginLeft: "auto", marginRight: "auto" }
+      : block.style.align === "right"
+        ? { marginLeft: "auto" }
+        : { marginRight: "auto" };
 
   return (
     <div
       style={{
         padding: sidesToCss(toSides(block.style.padding)),
-        textAlign: block.style.align,
-        ...(hugWidth ? { width: "fit-content", maxWidth: "100%" } : {}),
+        display: "flex",
+        alignItems: "center",
+        gap: block.style.gap ?? 8,
+        ...(hugWidth ? { width: "fit-content", maxWidth: "100%", ...groupAlign } : {}),
         ...commonStyleToReactStyle(block.style),
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={label}
-        style={imageToReactStyle(width, height, block.style.align)}
-        data-resize-target={block.id}
-      />
+      {items.map((item, index) => {
+        const label = SOCIAL_PLATFORMS[item.platform]?.label ?? item.platform;
+        const src = socialIconUrl(
+          item.platform,
+          block.style.iconColor,
+          urlSize(width.unit === "px" ? width.value : 0, height.unit === "px" ? height.value : 0),
+        );
+        return (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            key={`${item.platform}-${index}`}
+            src={src}
+            alt={label}
+            style={imageToReactStyle(width, height, "left")}
+            data-resize-target={index === 0 ? block.id : undefined}
+          />
+        );
+      })}
     </div>
   );
 }
