@@ -81,7 +81,7 @@ export function SortableBlockItem({
           if (!selectedBlockIds.includes(block.id)) selectBlock(block.id);
         }}
         className={cn(
-          "group/block relative border border-transparent hover:border-primary/40",
+          "relative border border-transparent hover:border-primary/40",
           stretchWidth ? "w-full max-w-full min-w-0" : "w-auto max-w-full min-w-0",
           stretchHeight && "h-full min-h-0 self-stretch",
           flexHeight && "flex min-h-0 min-w-0 flex-col",
@@ -93,13 +93,9 @@ export function SortableBlockItem({
           indicator.showStackBorder && "ring-2 ring-primary ring-offset-1 rounded"
         )}
       >
-        {!isDragging && (
+        {isPrimary && !isDragging && (
           <div
-            className={cn(
-              "absolute right-1 top-1 z-30 flex items-center gap-0.5 rounded-lg border bg-background/95 p-0.5 text-muted-foreground shadow-md backdrop-blur transition-opacity",
-              "opacity-0 group-hover/block:opacity-100 focus-within:opacity-100",
-              isSelected && "opacity-100",
-            )}
+            className="absolute right-1 top-1 z-30 flex items-center gap-0.5 rounded-lg border bg-background/95 p-0.5 text-muted-foreground shadow-md backdrop-blur"
             onClick={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
           >
