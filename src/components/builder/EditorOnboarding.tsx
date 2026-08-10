@@ -72,12 +72,13 @@ function findVisibleTarget(selector: string): HTMLElement | null {
   }) ?? null;
 }
 
-export function EditorOnboarding() {
+export function EditorOnboarding({ storageScope }: { storageScope: string }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
   const [cardSize, setCardSize] = useState({ width: 340, height: 220 });
   const cardRef = useRef<HTMLDivElement>(null);
+  const storageKey = `${STORAGE_KEY}:${storageScope}`;
 
   const locateTarget = useCallback(() => {
     if (!open) return;
@@ -99,10 +100,11 @@ export function EditorOnboarding() {
 
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(STORAGE_KEY) !== "done") setOpen(true);
+      setOpen(window.localStorage.getItem(storageKey) !== "done");
     } catch {
       setOpen(true);
     }
+    setStep(0);
 
     function handleStart(event: Event) {
       const customEvent = event as CustomEvent<{ stepId?: EditorTourStepId }>;
@@ -113,7 +115,7 @@ export function EditorOnboarding() {
 
     window.addEventListener(EDITOR_TOUR_EVENT, handleStart);
     return () => window.removeEventListener(EDITOR_TOUR_EVENT, handleStart);
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     if (!open) return;
@@ -150,7 +152,7 @@ export function EditorOnboarding() {
 
   function dismiss() {
     try {
-      window.localStorage.setItem(STORAGE_KEY, "done");
+      window.localStorage.setItem(storageKey, "done");
     } catch {
       // The tour still closes for this session if storage is unavailable.
     }

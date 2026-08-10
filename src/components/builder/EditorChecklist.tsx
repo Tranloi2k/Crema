@@ -8,11 +8,13 @@ import { startEditorTour, type EditorTourStepId } from "@/lib/editorTour";
 const STORAGE_KEY = "crema:quick-start-completed:v1";
 
 export function EditorChecklist({
+  storageScope,
   hasContent,
   hasPreviewed,
   hasSentTest,
   isSaved,
 }: {
+  storageScope: string;
   hasContent: boolean;
   hasPreviewed: boolean;
   hasSentTest: boolean;
@@ -21,6 +23,7 @@ export function EditorChecklist({
   const [visibility, setVisibility] = useState<"checking" | "visible" | "hidden">(
     "checking",
   );
+  const storageKey = `${STORAGE_KEY}:${storageScope}`;
   const steps = [
     { label: "Add content", done: hasContent, icon: Sparkles, tourStep: "add-content" as EditorTourStepId },
     { label: "Preview", done: hasPreviewed, icon: Eye, tourStep: "preview" as EditorTourStepId },
@@ -33,25 +36,25 @@ export function EditorChecklist({
   useEffect(() => {
     try {
       setVisibility(
-        window.localStorage.getItem(STORAGE_KEY) === "done" ? "hidden" : "visible",
+        window.localStorage.getItem(storageKey) === "done" ? "hidden" : "visible",
       );
     } catch {
       setVisibility("visible");
     }
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     if (!isComplete || visibility !== "visible") return;
 
     try {
-      window.localStorage.setItem(STORAGE_KEY, "done");
+      window.localStorage.setItem(storageKey, "done");
     } catch {
       // The checklist still hides for this session when storage is unavailable.
     }
 
     const timer = window.setTimeout(() => setVisibility("hidden"), 1200);
     return () => window.clearTimeout(timer);
-  }, [isComplete, visibility]);
+  }, [isComplete, storageKey, visibility]);
 
   if (visibility !== "visible") return null;
 

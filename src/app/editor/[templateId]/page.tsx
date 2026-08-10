@@ -60,8 +60,11 @@ function getContainerArray(root: StackBlock, containerId: string): Block[] {
 export default function EditorPage() {
   const params = useParams<{ templateId: string }>();
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const templateId = params.templateId;
+  const onboardingScope = status === "authenticated"
+    ? ((session?.user as { id?: string } | undefined)?.id ?? "authenticated")
+    : "guest";
 
   const root = useEditorStore((s) => s.root);
   const selectedBlockId = useEditorStore((s) => s.selectedBlockId);
@@ -299,6 +302,7 @@ export default function EditorPage() {
       )}
       {!readOnly && (
         <EditorChecklist
+          storageScope={onboardingScope}
           hasContent={root.children.length > 0}
           hasPreviewed={hasPreviewed}
           hasSentTest={hasSentTest}
@@ -384,7 +388,7 @@ export default function EditorPage() {
         </DndContext>
       )}
       <PreviewModal root={root} open={previewOpen} onOpenChange={setPreviewOpen} />
-      {!readOnly && <EditorOnboarding />}
+      {!readOnly && <EditorOnboarding storageScope={onboardingScope} />}
     </>
   );
 }
