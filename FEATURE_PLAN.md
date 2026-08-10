@@ -31,8 +31,6 @@ Kế hoạch dưới đây đã được kiểm tra trực tiếp trong code đ�
 6. ✅ **Share link xem trước (read-only public)** — link công khai `/p/[slug]` tới template; toggle Share trong editor.
 7. **Gửi campaign thật** — gửi tới danh sách subscriber (Resend batch / Mailchimp / Klaviyo). *(chưa làm)*
 
-> **Migration bắt buộc cho Tier 1 + Tier 2:** chạy `npm run db:migrate-features` (KHÔNG dùng `db:push` — nó sẽ xoá nhầm cột stripe* cũ). Script này tạo bảng `template_versions` và thêm cột `publicSlug`/`isPublic`, idempotent và không phá dữ liệu.
-
 ### Tier 3 — cân nhắc sau
 8. **Brand/global styles** — màu/font/logo mặc định của brand.
 9. **Team/workspace** — chia sẻ template trong nhóm (thay đổi schema lớn).

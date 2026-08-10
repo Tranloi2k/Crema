@@ -12,6 +12,7 @@ export const users = sqliteTable("user", {
   emailVerified: integer("emailVerified", { mode: "timestamp_ms" }),
   image: text("image"),
   passwordHash: text("passwordHash"),
+  welcomeEmailSentAt: integer("welcomeEmailSentAt", { mode: "timestamp_ms" }),
   plan: text("plan").notNull().default("free"),
   planInterval: text("planInterval"),
   planStatus: text("planStatus"),

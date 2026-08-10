@@ -35,12 +35,15 @@ export async function sendWelcomeEmail({
   );
 
   try {
-    await getResendClient().emails.send({
+    const { error } = await getResendClient().emails.send({
       from: process.env.RESEND_FROM_EMAIL ?? "Crema <onboarding@resend.dev>",
       to,
       subject: WELCOME_EMAIL_SUBJECT,
       html,
     });
+    if (error) {
+      return { ok: false, error: error.message };
+    }
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };

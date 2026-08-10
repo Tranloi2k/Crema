@@ -1,10 +1,4 @@
-import type {
-  Block,
-  ButtonBlock,
-  DividerBlock,
-  StackBlock,
-  TextBlock,
-} from "@/lib/types";
+import type { Block, ButtonBlock, StackBlock, TextBlock } from "@/lib/types";
 import {
   DEFAULT_COMMON_STYLE,
   DEFAULT_FONT_FAMILY,
@@ -14,19 +8,19 @@ import {
 import { ROOT_ID } from "@/lib/defaultBlocks";
 import { getAppBaseUrl } from "@/lib/appUrl";
 
-export const WELCOME_EMAIL_SUBJECT = "Welcome to Crema — let's build your first email";
+export const WELCOME_EMAIL_SUBJECT = "Welcome to Crema - let's build your first email";
 export const WELCOME_EMAIL_TEMPLATE_NAME = "Welcome email (new users)";
 
-const BRAND_PRIMARY = "#5046e5";
-const TEXT_PRIMARY = "#111827";
-const TEXT_MUTED = "#6b7280";
-const TEXT_FOOTER = "#9ca3af";
-const BORDER_LIGHT = "#e5e7eb";
+const BRAND_PRIMARY = "#6d5dfc";
+const BRAND_DARK = "#17132f";
+const BRAND_SOFT = "#f3f0ff";
+const TEXT_PRIMARY = "#19162b";
+const TEXT_MUTED = "#68647a";
+const TEXT_FOOTER = "#918da3";
+const BORDER_LIGHT = "#e8e5f0";
 
 export type WelcomeEmailTemplateOptions = {
-  /** Recipient first name — injected into copy when not using merge tags. */
   firstName?: string;
-  /** Use Brevo-style {{ params.* }} placeholders for the editor preset. */
   useMergeTags?: boolean;
   dashboardUrl?: string;
 };
@@ -74,7 +68,12 @@ function textBlock(
   };
 }
 
-function buttonBlock(id: string, label: string, href: string): ButtonBlock {
+function buttonBlock(
+  id: string,
+  label: string,
+  href: string,
+  align: ButtonBlock["style"]["align"] = "left"
+): ButtonBlock {
   return {
     id,
     type: "button",
@@ -82,27 +81,12 @@ function buttonBlock(id: string, label: string, href: string): ButtonBlock {
     content: { label, href },
     style: {
       ...DEFAULT_COMMON_STYLE,
-      align: "left",
+      align,
       bgColor: BRAND_PRIMARY,
       textColor: "#ffffff",
-      borderRadius: 8,
+      borderRadius: 10,
       width: dim(0, "fit-content"),
       height: dim(0, "fit-content"),
-      padding: sides(0),
-    },
-  };
-}
-
-function dividerBlock(id: string): DividerBlock {
-  return {
-    id,
-    type: "divider",
-    name: "Divider",
-    content: {},
-    style: {
-      ...DEFAULT_COMMON_STYLE,
-      color: BORDER_LIGHT,
-      thickness: 1,
       padding: sides(0),
     },
   };
@@ -134,7 +118,51 @@ function stackBlock(
   };
 }
 
-/** Inbox-ready welcome email — usable in the editor, preview, export, and transactional send. */
+function step(number: string, title: string, description: string): StackBlock {
+  return stackBlock(
+    `welcome-step-${number}`,
+    `Step ${number}`,
+    [
+      textBlock(
+        `welcome-step-${number}-number`,
+        `Step ${number} number`,
+        `<p><strong>${number}</strong></p>`,
+        {
+          color: BRAND_PRIMARY,
+          bgColor: BRAND_SOFT,
+          fontSize: 14,
+          fontWeight: 700,
+          align: "center",
+          width: dim(38, "px"),
+          padding: { top: 9, right: 0, bottom: 9, left: 0, linked: false },
+          border: { width: 0, color: BRAND_SOFT, style: "solid", radius: 19 },
+        }
+      ),
+      textBlock(
+        `welcome-step-${number}-copy`,
+        `Step ${number} copy`,
+        `<p><strong>${title}</strong></p><p>${description}</p>`,
+        {
+          color: TEXT_MUTED,
+          fontSize: 14,
+          lineHeight: 1.55,
+          width: dim(0, "fill"),
+          padding: sides(0),
+        }
+      ),
+    ],
+    {
+      direction: "row",
+      gap: 14,
+      align: "center",
+      bgColor: "#ffffff",
+      padding: sides(16, false),
+      border: { width: 1, color: BORDER_LIGHT, style: "solid", radius: 12 },
+    }
+  );
+}
+
+/** Inbox-ready welcome email shared by the editor preset and transactional send. */
 export function createWelcomeEmailTemplate(
   options: WelcomeEmailTemplateOptions = {}
 ): StackBlock {
@@ -145,111 +173,184 @@ export function createWelcomeEmailTemplate(
     "welcome-header",
     "Header",
     [
+      textBlock("welcome-logo", "Brand", "<p><strong>CREMA</strong></p>", {
+        color: "#ffffff",
+        fontSize: 20,
+        fontWeight: 700,
+        letterSpacing: 2,
+        width: dim(0, "fill"),
+        padding: sides(0),
+      }),
       textBlock(
-        "welcome-logo",
-        "Brand",
-        "<p><strong>CREMA</strong></p>",
+        "welcome-header-label",
+        "Header label",
+        "<p><strong>EMAIL BUILDER</strong></p>",
         {
-          color: "#ffffff",
-          fontSize: 22,
+          color: "#c9c3ff",
+          fontSize: 10,
           fontWeight: 700,
-          padding: sides(0),
-        }
-      ),
-    ],
-    {
-      bgColor: BRAND_PRIMARY,
-      padding: { top: 20, right: 24, bottom: 20, left: 24, linked: false },
-      border: {
-        width: 0,
-        color: BORDER_LIGHT,
-        style: "solid",
-        radius: { topLeft: 0, topRight: 0, bottomRight: 12, bottomLeft: 12, linked: false },
-      },
-    }
-  );
-
-  const body = stackBlock(
-    "welcome-body",
-    "Body",
-    [
-      textBlock(
-        "welcome-title",
-        "Headline",
-        `<p><strong>Welcome, ${name}!</strong></p>`,
-        {
-          fontSize: 26,
-          fontWeight: 700,
-          padding: { top: 0, right: 0, bottom: 12, left: 0, linked: false },
-        }
-      ),
-      textBlock(
-        "welcome-intro",
-        "Intro",
-        `<p>Thanks for joining <strong>Crema</strong> — the drag-and-drop email builder for inbox-ready HTML templates.</p>`,
-        {
-          color: TEXT_MUTED,
-          fontSize: 16,
-          padding: { top: 0, right: 0, bottom: 16, left: 0, linked: false },
-        }
-      ),
-      textBlock(
-        "welcome-steps",
-        "Steps",
-        `<p>Here's how to get started:</p><ul><li>Open your dashboard and create a template</li><li>Drag blocks — text, images, buttons, stacks</li><li>Preview on desktop &amp; mobile, then export HTML</li><li>Use merge tags for Brevo, Mailchimp, and more</li></ul>`,
-        {
-          color: TEXT_MUTED,
-          fontSize: 15,
-          padding: { top: 0, right: 0, bottom: 20, left: 0, linked: false },
-        }
-      ),
-      buttonBlock("welcome-cta", "Go to dashboard", dashboardUrl),
-    ],
-    {
-      height: dim(0, "fill"),
-      padding: sides(24, false),
-    }
-  );
-
-  const footer = stackBlock(
-    "welcome-footer",
-    "Footer",
-    [
-      textBlock(
-        "welcome-footer-left",
-        "Copyright",
-        "<p>© 2026 Crema. All rights reserved.</p>",
-        {
-          color: TEXT_FOOTER,
-          fontSize: 12,
-          width: dim(0, "fill"),
-          padding: sides(0),
-        }
-      ),
-      textBlock(
-        "welcome-footer-right",
-        "Tagline",
-        "<p>Build and export email templates.</p>",
-        {
-          color: TEXT_FOOTER,
-          fontSize: 12,
+          letterSpacing: 1.2,
           align: "right",
-          width: dim(0, "fill"),
+          width: dim(0, "fit-content"),
           padding: sides(0),
         }
       ),
     ],
     {
       direction: "row",
-      gap: 12,
       justify: "between",
       align: "center",
-      padding: { top: 16, right: 24, bottom: 20, left: 24, linked: false },
+      bgColor: BRAND_DARK,
+      padding: { top: 22, right: 32, bottom: 22, left: 32, linked: false },
+      border: {
+        width: 0,
+        color: BORDER_LIGHT,
+        style: "solid",
+        radius: { topLeft: 16, topRight: 16, bottomRight: 0, bottomLeft: 0, linked: false },
+      },
     }
   );
 
-  const divider = dividerBlock("welcome-divider");
-  divider.style.padding = { top: 0, right: 24, bottom: 0, left: 24, linked: false };
+  const hero = stackBlock(
+    "welcome-hero",
+    "Hero",
+    [
+      textBlock(
+        "welcome-eyebrow",
+        "Eyebrow",
+        "<p><strong>YOUR CREATIVE WORKSPACE IS READY</strong></p>",
+        {
+          color: BRAND_PRIMARY,
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1.4,
+          align: "center",
+          padding: { top: 0, right: 0, bottom: 14, left: 0, linked: false },
+        }
+      ),
+      textBlock("welcome-title", "Headline", `<p><strong>Welcome to Crema,<br>${name}.</strong></p>`, {
+        fontSize: 32,
+        fontWeight: 700,
+        lineHeight: 1.18,
+        letterSpacing: -0.6,
+        align: "center",
+        padding: { top: 0, right: 0, bottom: 16, left: 0, linked: false },
+      }),
+      textBlock(
+        "welcome-intro",
+        "Intro",
+        "<p>Turn ideas into polished, inbox-ready emails with a visual builder made for speed.</p>",
+        {
+          color: TEXT_MUTED,
+          fontSize: 16,
+          lineHeight: 1.6,
+          align: "center",
+          padding: { top: 0, right: 36, bottom: 24, left: 36, linked: false },
+        }
+      ),
+      buttonBlock("welcome-cta", "Start creating \u2192", dashboardUrl, "center"),
+    ],
+    {
+      bgColor: BRAND_SOFT,
+      align: "center",
+      padding: { top: 38, right: 32, bottom: 40, left: 32, linked: false },
+    }
+  );
+
+  const gettingStarted = stackBlock(
+    "welcome-getting-started",
+    "Getting started",
+    [
+      textBlock(
+        "welcome-section-title",
+        "Section title",
+        "<p><strong>Create something great in minutes</strong></p>",
+        {
+          fontSize: 20,
+          fontWeight: 700,
+          padding: { top: 0, right: 0, bottom: 4, left: 0, linked: false },
+        }
+      ),
+      textBlock(
+        "welcome-section-intro",
+        "Section intro",
+        "<p>Your first campaign is only three small steps away.</p>",
+        {
+          color: TEXT_MUTED,
+          fontSize: 14,
+          padding: { top: 0, right: 0, bottom: 14, left: 0, linked: false },
+        }
+      ),
+      step("01", "Choose a starting point", "Begin from a preset or a clean canvas."),
+      step("02", "Make it yours", "Drag in content, tune the details, and add merge tags."),
+      step("03", "Preview and export", "Check every screen size, then copy production-ready HTML."),
+    ],
+    {
+      gap: 10,
+      padding: { top: 32, right: 32, bottom: 24, left: 32, linked: false },
+    }
+  );
+
+  const tip = stackBlock(
+    "welcome-tip",
+    "Pro tip",
+    [
+      textBlock(
+        "welcome-tip-copy",
+        "Pro tip copy",
+        "<p><strong>Quick tip:</strong> Send yourself a test email before exporting to see exactly how your design feels in a real inbox.</p>",
+        {
+          color: "#514b70",
+          fontSize: 13,
+          lineHeight: 1.55,
+          padding: sides(0),
+        }
+      ),
+    ],
+    {
+      bgColor: "#f8f7fc",
+      padding: { top: 16, right: 18, bottom: 16, left: 18, linked: false },
+      border: { width: 1, color: BORDER_LIGHT, style: "solid", radius: 10 },
+    }
+  );
+
+  const tipWrapper = stackBlock("welcome-tip-wrapper", "Tip wrapper", [tip], {
+    padding: { top: 0, right: 32, bottom: 32, left: 32, linked: false },
+  });
+
+  const footer = stackBlock(
+    "welcome-footer",
+    "Footer",
+    [
+      textBlock("welcome-footer-left", "Copyright", "<p>&copy; 2026 Crema</p>", {
+        color: TEXT_FOOTER,
+        fontSize: 12,
+        width: dim(0, "fill"),
+        padding: sides(0),
+      }),
+      textBlock("welcome-footer-right", "Tagline", "<p>Made for better inboxes.</p>", {
+        color: TEXT_FOOTER,
+        fontSize: 12,
+        align: "right",
+        width: dim(0, "fill"),
+        padding: sides(0),
+      }),
+    ],
+    {
+      direction: "row",
+      gap: 12,
+      justify: "between",
+      align: "center",
+      bgColor: BRAND_DARK,
+      padding: { top: 20, right: 32, bottom: 20, left: 32, linked: false },
+      border: {
+        width: 0,
+        color: BRAND_DARK,
+        style: "solid",
+        radius: { topLeft: 0, topRight: 0, bottomRight: 16, bottomLeft: 16, linked: false },
+      },
+    }
+  );
 
   return {
     id: ROOT_ID,
@@ -264,9 +365,10 @@ export function createWelcomeEmailTemplate(
       justify: "start",
       align: "start",
       width: dim(600, "px"),
-      height: dim(600, "px"),
+      height: dim(0, "fit-content"),
       bgColor: "#ffffff",
+      border: { width: 1, color: BORDER_LIGHT, style: "solid", radius: 16 },
     },
-    children: [header, body, divider, footer],
+    children: [header, hero, gettingStarted, tipWrapper, footer],
   };
 }

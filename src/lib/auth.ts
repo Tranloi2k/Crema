@@ -5,7 +5,7 @@ import GoogleProvider from "next-auth/providers/google";
 import GithubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
 import { users, accounts, sessions, verificationTokens } from "@/lib/db/schema";
@@ -173,16 +173,43 @@ export const authOptions: NextAuthOptions = {
   ...(isDevBypassEnabled() ? { allowDangerousEmailAccountLinking: true } : {}),
   events: {
     async createUser({ user }) {
-      if (!user.id || !user.email) return;
+      if (!user.id) return;
       try {
         await seedWelcomeTemplate(user.id);
       } catch {
         // OAuth signup should still complete if seeding fails.
       }
-      void sendWelcomeEmail({
-        to: user.email,
-        name: user.name ?? "there",
-      }).catch(() => {});
+    },
+    async signIn({ user, account }) {
+      if (!user.id || !user.email || account?.provider === "dev-bypass") return;
+
+      try {
+        // Atomically claim the welcome email so concurrent/repeated sign-ins do
+        // not send duplicates. A failed/skipped send releases the claim so a
+        // later sign-in can retry after Resend has been configured or recovered.
+        const [claimed] = await db
+          .update(users)
+          .set({ welcomeEmailSentAt: new Date() })
+          .where(and(eq(users.id, user.id), isNull(users.welcomeEmailSentAt)))
+          .returning({ id: users.id });
+
+        if (!claimed) return;
+
+        const result = await sendWelcomeEmail({
+          to: user.email,
+          name: user.name ?? "there",
+        });
+
+        if (!result.ok) {
+          await db
+            .update(users)
+            .set({ welcomeEmailSentAt: null })
+            .where(eq(users.id, user.id));
+        }
+      } catch (error) {
+        // Email delivery must never prevent a successful sign-in.
+        console.error("[auth] Could not send welcome email", error);
+      }
     },
   },
 };

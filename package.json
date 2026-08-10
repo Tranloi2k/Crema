@@ -8,9 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "db:migrate-billing": "npx tsx scripts/migrate-billing.ts",
-    "db:migrate-features": "npx tsx scripts/migrate-features.ts"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",

@@ -17,10 +17,10 @@ import { ROOT_ID } from "@/lib/defaultBlocks";
 // Shared block factory helpers for preset email templates. Mirrors the patterns
 // in welcomeEmailTemplate.ts so every preset produces inbox-ready, editable blocks.
 
-export const PRESET_TEXT_PRIMARY = "#111827";
-export const PRESET_TEXT_MUTED = "#6b7280";
-export const PRESET_TEXT_FOOTER = "#9ca3af";
-export const PRESET_BORDER_LIGHT = "#e5e7eb";
+export const PRESET_TEXT_PRIMARY = "#19162b";
+export const PRESET_TEXT_MUTED = "#68647a";
+export const PRESET_TEXT_FOOTER = "#918da3";
+export const PRESET_BORDER_LIGHT = "#e8e5f0";
 
 let presetCounter = 0;
 function pid(prefix: string): string {
@@ -62,7 +62,7 @@ export function text(
 export function button(
   label: string,
   href: string,
-  bgColor = "#5046e5",
+  bgColor = "#6d5dfc",
   style: Partial<ButtonBlock["style"]> = {}
 ): ButtonBlock {
   return {
@@ -75,7 +75,7 @@ export function button(
       align: "left",
       bgColor,
       textColor: "#ffffff",
-      borderRadius: 8,
+      borderRadius: 10,
       width: dim(0, "fit-content"),
       height: dim(0, "fit-content"),
       padding: sides(0),
@@ -159,6 +159,7 @@ export function presetRoot(children: Block[], bgColor = "#ffffff"): StackBlock {
       width: dim(600, "px"),
       height: dim(0, "fit-content"),
       bgColor,
+      border: { width: 1, color: PRESET_BORDER_LIGHT, style: "solid", radius: 16 },
     },
     children,
   };
