@@ -5,25 +5,24 @@ const COLUMNS = [
   {
     title: "Product",
     links: [
-      { label: "Features", href: "#features" },
-      { label: "How it works", href: "#how" },
-      { label: "Pricing", href: "#pricing" },
-      { label: "Support", href: "#support" },
+      { label: "Features", href: "/#features" },
+      { label: "How it works", href: "/#how" },
+      { label: "Pricing", href: "/#pricing" },
+      { label: "Support", href: "/#support" },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "About", href: "#" },
-      { label: "Blog", href: "#" },
+      { label: "About", href: "/about" },
       { label: "Contact", href: "mailto:support@cremastudio.work" },
     ],
   },
   {
     title: "Legal",
     links: [
-      { label: "Privacy", href: "#" },
-      { label: "Terms", href: "#" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
     ],
   },
 ];

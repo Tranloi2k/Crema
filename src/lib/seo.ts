@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { getAppBaseUrl } from "@/lib/appUrl";
 
 export const SITE_NAME = "Crema";
 
@@ -41,7 +40,8 @@ export const DEFAULT_KEYWORDS = [
 ];
 
 export function getSiteUrl(): string {
-  return getAppBaseUrl();
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  return (configuredUrl || "https://cremastudio.work").replace(/\/$/, "");
 }
 
 export function absoluteUrl(path = "/"): string {

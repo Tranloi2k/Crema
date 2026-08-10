@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { label: "Features", href: "#features" },
-  { label: "How it works", href: "#how" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "Support", href: "#support" },
+  { label: "Features", href: "/#features" },
+  { label: "How it works", href: "/#how" },
+  { label: "Pricing", href: "/#pricing" },
+  { label: "Support", href: "/#support" },
 ];
 
 export function Header() {

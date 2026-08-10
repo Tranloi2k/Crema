@@ -2,26 +2,26 @@ import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date();
-
   return [
     {
       url: absoluteUrl("/"),
-      lastModified,
       changeFrequency: "weekly",
       priority: 1,
     },
     {
-      url: absoluteUrl("/login"),
-      lastModified,
+      url: absoluteUrl("/about"),
       changeFrequency: "monthly",
-      priority: 0.3,
+      priority: 0.7,
     },
     {
-      url: absoluteUrl("/signup"),
-      lastModified,
-      changeFrequency: "monthly",
-      priority: 0.5,
+      url: absoluteUrl("/privacy"),
+      changeFrequency: "yearly",
+      priority: 0.2,
+    },
+    {
+      url: absoluteUrl("/terms"),
+      changeFrequency: "yearly",
+      priority: 0.2,
     },
   ];
 }

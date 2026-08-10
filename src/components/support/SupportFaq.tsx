@@ -1,12 +1,12 @@
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type FaqItem = {
+export type FaqItem = {
   question: string;
   answer: string;
 };
 
-const FAQ_ITEMS: FaqItem[] = [
+export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Do I need to know HTML to use Crema?",
     answer:
