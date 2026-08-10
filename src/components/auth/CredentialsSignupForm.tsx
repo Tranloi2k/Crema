@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmailOtpVerification } from "@/components/auth/EmailOtpVerification";
 
 export function CredentialsSignupForm({ callbackUrl = "/dashboard" }: { callbackUrl?: string }) {
   const [name, setName] = useState("");
@@ -13,6 +14,26 @@ export function CredentialsSignupForm({ callbackUrl = "/dashboard" }: { callback
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [verification, setVerification] = useState<{
+    email: string;
+    devOtp?: string;
+    retryAfter?: number;
+    deliveryError?: string;
+  } | null>(null);
+
+  async function finishSignIn() {
+    const result = await signIn("credentials", {
+      email: verification?.email ?? email.trim().toLowerCase(),
+      password,
+      redirect: false,
+    });
+    if (result?.error) {
+      setVerification(null);
+      setError("Email verified. Sign in with the password you used when creating the account.");
+      return;
+    }
+    window.location.assign(callbackUrl);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,29 +57,47 @@ export function CredentialsSignupForm({ callbackUrl = "/dashboard" }: { callback
         }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        requiresVerification?: boolean;
+        devOtp?: string;
+        retryAfter?: number;
+        deliveryError?: string;
+      };
+      if (data.requiresVerification) {
+        setVerification({
+          email: email.trim().toLowerCase(),
+          devOtp: data.devOtp,
+          retryAfter: data.retryAfter,
+          deliveryError: data.deliveryError,
+        });
+        return;
+      }
       if (!res.ok) {
-        setError(typeof data.error === "string" ? data.error : "Could not create account.");
+        setError(data.error ?? "Could not create account.");
         return;
       }
-
-      const result = await signIn("credentials", {
-        email: email.trim().toLowerCase(),
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError("Account created but sign-in failed. Please log in.");
-        return;
-      }
-
-      window.location.assign(callbackUrl);
     } catch {
       setError("Could not create account. Please try again.");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (verification) {
+    return (
+      <EmailOtpVerification
+        email={verification.email}
+        devOtp={verification.devOtp}
+        initialRetryAfter={verification.retryAfter}
+        initialError={verification.deliveryError}
+        onVerified={finishSignIn}
+        onBack={() => {
+          setVerification(null);
+          setError(null);
+        }}
+      />
+    );
   }
 
   return (

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // Table names/shapes mirror @auth/drizzle-adapter's sqlite defaults exactly,
 // so DrizzleAdapter(db, { usersTable, accountsTable, sessionsTable, verificationTokensTable })
@@ -12,6 +12,10 @@ export const users = sqliteTable("user", {
   emailVerified: integer("emailVerified", { mode: "timestamp_ms" }),
   image: text("image"),
   passwordHash: text("passwordHash"),
+  emailVerificationCodeHash: text("emailVerificationCodeHash"),
+  emailVerificationExpiresAt: integer("emailVerificationExpiresAt", { mode: "timestamp_ms" }),
+  emailVerificationSentAt: integer("emailVerificationSentAt", { mode: "timestamp_ms" }),
+  emailVerificationAttempts: integer("emailVerificationAttempts").default(0),
   welcomeEmailSentAt: integer("welcomeEmailSentAt", { mode: "timestamp_ms" }),
   plan: text("plan").notNull().default("free"),
   planInterval: text("planInterval"),
@@ -68,23 +72,29 @@ export const verificationTokens = sqliteTable(
   })
 );
 
-export const templates = sqliteTable("templates", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  userId: text("userId")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  content: text("content").notNull(), // JSON-stringified Block[]
-  createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
-  locked: integer("locked", { mode: "boolean" }).notNull().default(false),
-  // Read-only public preview: when isPublic is true the template is viewable at
-  // /p/{publicSlug} without auth. The slug is unguessable and revoked on toggle-off.
-  publicSlug: text("publicSlug").unique(),
-  isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
-});
+export const templates = sqliteTable(
+  "templates",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    content: text("content").notNull(), // JSON-stringified Block[]
+    createdAt: integer("createdAt", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).notNull(),
+    locked: integer("locked", { mode: "boolean" }).notNull().default(false),
+    // Read-only public preview: when isPublic is true the template is viewable at
+    // /p/{publicSlug} without auth. The slug is unguessable and revoked on toggle-off.
+    publicSlug: text("publicSlug"),
+    isPublic: integer("isPublic", { mode: "boolean" }).notNull().default(false),
+  },
+  (table) => ({
+    publicSlugUnique: uniqueIndex("idx_templates_publicSlug").on(table.publicSlug),
+  })
+);
 
 // Periodic snapshots of a template's content so autosave (which overwrites the
 // live row) can't permanently lose good work. Capped per-template on insert.
