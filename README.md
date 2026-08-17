@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Crema
 
-## Getting Started
+Crema is a drag and drop email builder. You drop blocks on a canvas, check desktop and mobile, send yourself a test, then export HTML that still works in real inboxes.
 
-First, run the development server:
+Live site: [cremastudio.work](https://cremastudio.work)
+
+## What it does
+
+The editor is block based: text, image, button, divider, spacer, stack, and social icons. Stacks can nest. You get undo/redo, autosave, and version history if you need to roll back.
+
+Other bits:
+
+- Desktop and mobile preview, plus a test send through Resend
+- HTML export (table based, because email clients) and a plain text version
+- Starter templates: Welcome, Newsletter, Announcement, Promotion
+- Guest drafts in localStorage, no account required until you want to save for real
+- Google, GitHub, or email/password with a 6-digit OTP
+- Optional public link at `/p/[slug]`
+- Merge tags for Brevo, Mailchimp, SendGrid, Klaviyo, or a generic format
+- Billing through Lemon Squeezy (Free / Pro / Pro+)
+
+## Stack
+
+Next.js 15 (App Router), React 19, TypeScript. Tailwind and shadcn for UI, TipTap for text, Zustand + @dnd-kit for the editor.
+
+Database is Drizzle on Turso. Auth is NextAuth (JWT). Images go to Cloudinary. Email is Resend. Payments are Lemon Squeezy.
+
+## Getting started
+
+You need Node 18+ and a [Turso](https://turso.tech) database.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/Tranloi2k/Crema.git
+cd Crema
+npm install
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill in `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `NEXTAUTH_SECRET` at minimum. Then:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run db:push
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+App runs at [http://localhost:3001](http://localhost:3001), not 3000.
 
-## Learn More
+Locally you get a "Continue as Dev User" button. That stays off on Vercel. Set `ALLOW_DEV_BYPASS=false` if you don't want it even on your machine.
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev        # port 3001
+npm run build
+npm start
+npm run lint
+npm run db:push    # push schema to Turso
+npm run db:studio
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Where things live
 
-## Deploy on Vercel
+```
+src/app/          pages and API routes
+src/components/   builder, dashboard, auth, marketing
+src/lib/          auth, billing, schema, HTML export, editor store
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Editor is `/editor/[templateId]`. Dashboard is `/dashboard`. Public preview is `/p/[slug]`. Schema sits in `src/lib/db/schema.ts`, HTML export in `src/lib/export/toHtml.ts`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+Private. All rights reserved.
